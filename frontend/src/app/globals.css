@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+.font-editorial {
+  font-family: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+:root {
+  --background: #080a11;
+  --foreground: #f8fafc;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
