@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Solo activar standalone cuando se construye con Docker
+  ...(process.env.DOCKER_BUILD === "1" ? { output: "standalone" } : {}),
 };
 
 export default nextConfig;

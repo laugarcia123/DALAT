@@ -41,8 +41,10 @@ export async function apiFetch<T>(
   const { requiresAuth = true, headers: customHeaders, ...restOptions } = options;
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
+  const isFormData = typeof FormData !== "undefined" && restOptions.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(customHeaders as Record<string, string>),
   };
 

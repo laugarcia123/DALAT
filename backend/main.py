@@ -4,14 +4,22 @@ from db.database import engine, Base
 import models.user         # Registra Usuario en Base.metadata
 import models.subject      # Registra Asignatura y Evaluacion en Base.metadata
 import models.ai_resource  # Registra RecursoIA en Base.metadata
+import models.task         # Registra Tarea en Base.metadata
+import models.schedule     # Registra HorarioClase en Base.metadata
+import models.repository   # Registra EquipoEstudio y DocumentoRepositorio en Base.metadata
+import models.study_session # Registra SesionEstudio en Base.metadata
 from routers.user import router as user_router
 from routers.subject import router as subject_router
 from routers.ai import router as ai_router
+from routers.task import router as task_router
+from routers.schedule import router as schedule_router
+from routers.repository import router as repository_router
+from routers.study_session import router as study_session_router
 
 # Inicialización de la aplicación FastAPI
 app = FastAPI(
     title="Dalat Backend API",
-    description="API RESTful para el Asistente de Estudio Inteligente Dalat (Gestión de Usuarios, Asignaturas, Notas y Recursos IA)",
+    description="API RESTful para el Asistente de Estudio Inteligente Dalat (Gestión de Usuarios, Tareas, Asignaturas, Notas y Recursos IA)",
     version="1.0.0",
 )
 
@@ -40,6 +48,10 @@ except Exception as e:
 app.include_router(user_router, prefix="/api")
 app.include_router(subject_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(task_router, prefix="/api")
+app.include_router(schedule_router, prefix="/api")
+app.include_router(repository_router, prefix="/api")
+app.include_router(study_session_router, prefix="/api")
 
 
 @app.get("/", tags=["Salud"])

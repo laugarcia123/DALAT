@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import {
   Mail,
   User,
@@ -53,20 +54,20 @@ export default function LoginScreen({
   onCancel,
   initialMode = "login",
 }: LoginScreenProps) {
-  // Main mode: "login" or "register"
+  // Mode: "login" or "register"
   const [mode, setMode] = useState<"login" | "register">(initialMode);
 
-  // In Login: 2 options ("normal" for regular user | "institucion" for institution student)
+  // In Login mode: "normal" | "institucion"
   const [loginType, setLoginType] = useState<"normal" | "institucion">("normal");
 
-  // Common Form Fields
+  // Inputs
   const [name, setName] = useState(defaultName || "Andrea Gómez");
   const [email, setEmail] = useState(defaultEmail || "andrea@universidad.edu");
   const [password, setPassword] = useState("Dalat2026*");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // Institution specific fields
+  // Institution specific inputs
   const [selectedInstitution, setSelectedInstitution] = useState(INSTITUTIONS_LIST[0]);
   const [customInstitution, setCustomInstitution] = useState("");
   const [institutionalEmail, setInstitutionalEmail] = useState("estudiante@unal.edu.co");
@@ -75,7 +76,7 @@ export default function LoginScreen({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Recovery modal
+  // Password Recovery modal
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState(defaultEmail || "");
   const [recoverySent, setRecoverySent] = useState(false);
@@ -87,16 +88,14 @@ export default function LoginScreen({
 
     try {
       if (mode === "register") {
-        // Register is ONLY for normal user (no institution options)
         const newUser = await register({
           nombre: name.trim(),
           email: email.trim(),
           password: password,
         });
-        confetti({ particleCount: 35, spread: 60, origin: { y: 0.6 } });
+        confetti({ particleCount: 40, spread: 65, origin: { y: 0.6 } });
         onLogin(newUser.name, newUser.email, newUser.career, newUser.university);
       } else {
-        // Login mode
         const isInst = loginType === "institucion";
         const targetEmail = isInst ? institutionalEmail.trim() : email.trim();
         const finalUni = isInst
@@ -110,36 +109,23 @@ export default function LoginScreen({
           password: password,
           institucion: finalUni,
         });
-        confetti({ particleCount: 35, spread: 60, origin: { y: 0.6 } });
+        confetti({ particleCount: 40, spread: 65, origin: { y: 0.6 } });
         onLogin(loggedUser.name, loggedUser.email, loggedUser.career, loggedUser.university);
       }
-    } catch (err: any) {
-      console.error("[LoginScreen] Error en autenticación:", err);
+    } catch (err: unknown) {
+      console.error("[LoginScreen] Error de autenticación:", err);
+      const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(
-        err?.message ||
-          "Error al comunicarse con el servidor Dalat. Si no tienes el backend encendido, puedes usar el botón de 'Acceso Demo Rápido'."
+        msg ||
+          "Error al comunicarse con el servidor Dalat. Por favor verifica tus credenciales e intenta de nuevo."
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleQuickDemo = () => {
-    confetti({ particleCount: 35, spread: 65, origin: { y: 0.6 } });
-    if (loginType === "institucion" && mode === "login") {
-      onLogin(
-        "Andrea Gómez (UNAL)",
-        "andrea@unal.edu.co",
-        "Ingeniería de Sistemas",
-        "Universidad Nacional de Colombia"
-      );
-    } else {
-      onLogin(defaultName, defaultEmail);
-    }
-  };
-
   const handleSocialLogin = (provider: string) => {
-    confetti({ particleCount: 30, spread: 60, origin: { y: 0.6 } });
+    confetti({ particleCount: 35, spread: 65, origin: { y: 0.6 } });
     onLogin(defaultName, `${defaultName.toLowerCase().replace(/\s+/g, ".")}@${provider.toLowerCase()}.com`);
   };
 
@@ -153,564 +139,566 @@ export default function LoginScreen({
   };
 
   return (
-    <div className="min-h-screen bg-[#070913] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans selection:bg-[#7c5dfa] selection:text-white">
-      {/* Soft ambient backdrops */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] bg-[#7c5dfa]/10 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[420px] h-[420px] bg-[#22d3ee]/8 rounded-full blur-[130px] pointer-events-none" />
+    <div className="min-h-screen bg-[#060814] text-slate-100 flex items-center justify-center p-3 sm:p-6 lg:p-8 relative overflow-hidden font-sans selection:bg-[#7c5dfa] selection:text-white">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-[#7c5dfa]/10 rounded-full blur-[150px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[500px] h-[500px] bg-[#d946ef]/8 rounded-full blur-[140px] pointer-events-none" />
 
-      {/* Main Split-Card */}
-      <div className="w-full max-w-[880px] rounded-[28px] bg-[#0c0f1f] border border-[#1c223d] shadow-2xl shadow-black/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
+      {/* Floating Back to Home button */}
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="fixed top-5 left-5 z-40 inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white bg-[#0f1328]/80 hover:bg-[#161c3c] border border-white/[0.08] px-3.5 py-2 rounded-xl backdrop-blur-md shadow-lg transition duration-150 cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Volver al inicio</span>
+        </button>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MAIN DOUBLE-SLIDER CONTAINER (Inspired by classic Double Slider Layout)   */}
+      {/* ========================================================================= */}
+      <div className="w-full max-w-[1020px] min-h-[640px] rounded-[32px] bg-[#0c0f22]/95 border border-white/[0.1] shadow-2xl shadow-black/90 overflow-hidden relative z-10 flex flex-col lg:flex-row backdrop-blur-2xl">
         
-        {/* ================================================================= */}
-        {/* LEFT PANEL: MINIMAL GRAPHIC SHOWCASE                              */}
-        {/* ================================================================= */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-[#231a5e] via-[#352285] to-[#5a32c2] p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden text-white select-none min-h-[260px] lg:min-h-[540px]">
-          {/* Subtle dots pattern top-left */}
-          <div className="absolute top-7 left-7 grid grid-cols-4 gap-2 opacity-20 pointer-events-none">
-            {[...Array(16)].map((_, i) => (
-              <span key={i} className="w-1 h-1 rounded-full bg-white block" />
-            ))}
-          </div>
+        {/* ===================================================================== */}
+        {/* FORM 1: INICIAR SESIÓN (Left 50% in Desktop)                          */}
+        {/* ===================================================================== */}
+        <div
+          className={`w-full lg:w-1/2 p-6 sm:p-10 flex flex-col justify-between transition-all duration-700 ease-[cubic-bezier(0.77,0,0.175,1)] ${
+            mode === "login"
+              ? "opacity-100 translate-x-0 pointer-events-auto z-10"
+              : "opacity-0 -translate-x-12 pointer-events-none absolute lg:static"
+          }`}
+        >
+          {/* Logo Dalat Oficial con imagen */}
+          <div className="text-center space-y-2">
+            <Image
+              src="/dalat-logo-v2.png"
+              alt="Dalat"
+              width={140}
+              height={44}
+              className="h-10 sm:h-11 w-auto object-contain mx-auto"
+              priority
+            />
+            <h2 className="text-2xl sm:text-3xl font-editorial font-bold text-white tracking-tight">
+              Iniciar Sesión
+            </h2>
 
-          {/* Abstract circles and glowing sphere in corner */}
-          <div className="absolute -bottom-12 -right-12 w-56 h-56 pointer-events-none flex items-center justify-center">
-            <div className="w-52 h-52 rounded-full border border-white/20 absolute" />
-            <div className="w-36 h-36 rounded-full border border-white/25 absolute" />
-            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-400 to-[#7c5dfa] shadow-[0_0_35px_rgba(34,211,238,0.5)] flex items-center justify-center" />
-            <div className="absolute -top-1 right-10 w-5 h-5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]" />
-          </div>
-
-          {/* Top Back Link */}
-          <div className="relative z-10">
-            {onCancel && (
+            {/* Mobile Switcher */}
+            <div className="lg:hidden pt-1">
               <button
                 type="button"
-                onClick={onCancel}
-                className="inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition py-1 px-2.5 rounded-lg hover:bg-white/10"
+                onClick={() => setMode("register")}
+                className="text-xs font-bold text-purple-400 hover:text-purple-300"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Volver</span>
+                ¿No tienes cuenta? Regístrate aquí &rarr;
               </button>
-            )}
-          </div>
-
-          {/* Clean Central Title */}
-          <div className="relative z-10 my-auto py-8 space-y-3">
-            <h1 className="text-3xl sm:text-4xl font-editorial font-bold tracking-tight text-white leading-[1.15]">
-              {mode === "register" ? (
-                <>
-                  Tu viaje <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 to-violet-200">
-                    empieza aquí
-                  </span>
-                </>
-              ) : loginType === "institucion" ? (
-                <>
-                  Acceso <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-200 to-cyan-200">
-                    Institucional
-                  </span>
-                </>
-              ) : (
-                <>
-                  Bienvenido <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 to-violet-200">
-                    de nuevo
-                  </span>
-                </>
-              )}
-            </h1>
-
-            <p className="text-xs sm:text-sm text-indigo-100/75 font-normal leading-relaxed max-w-[240px]">
-              {mode === "register"
-                ? "Crea tu cuenta de usuario y empieza a organizar tus materias en Dalat."
-                : loginType === "institucion"
-                ? "Inicia sesión con la institución educativa a la que perteneces."
-                : "Ingresa a tu cuenta para continuar tus sesiones de estudio."}
-            </p>
-          </div>
-
-          {/* Bottom subtle logo */}
-          <div className="relative z-10 flex items-center gap-2 text-white/50 text-xs font-medium">
-            <span className={`w-2 h-2 rounded-full ${loginType === "institucion" && mode === "login" ? "bg-emerald-400" : "bg-cyan-400"}`} />
-            <span>Dalat</span>
-          </div>
-        </div>
-
-        {/* ================================================================= */}
-        {/* RIGHT PANEL: CLEAN AUTH FORM                                      */}
-        {/* ================================================================= */}
-        <div className="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-center bg-[#0c0f1f] text-slate-100">
-          
-          {/* Logo */}
-          <div className="flex flex-col items-center mb-4 text-center">
-            <div className="w-11 h-11 rounded-2xl bg-[#141933] border border-[#262f55] flex items-center justify-center shadow-lg shadow-[#7c5dfa]/15 mb-2">
-              <div className="w-6 h-6 rounded-xl bg-gradient-to-tr from-[#7c5dfa] to-cyan-400 flex items-center justify-center text-white font-black text-xs shadow-sm">
-                Σ
-              </div>
             </div>
 
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              {mode === "register" ? "Crear cuenta" : "Iniciar sesión"}
-            </h2>
-          </div>
-
-          {/* IF LOGIN: Mostrar 2 OPCIONES (Usuario normal vs Estudiante de institución) */}
-          {mode === "login" && (
-            <div className="flex bg-[#070914] p-1 rounded-xl border border-[#1c223e] mb-4 max-w-sm mx-auto w-full">
+            {/* Toggle Tipo de Usuario (Usuario Regular vs Estudiante de Institución) */}
+            <div className="grid grid-cols-2 p-1 rounded-xl bg-[#070914] border border-white/[0.08] text-[11px] font-semibold max-w-sm mx-auto mt-2 gap-1">
               <button
                 type="button"
                 onClick={() => setLoginType("normal")}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   loginType === "normal"
-                    ? "bg-[#7c5dfa] text-white shadow-sm"
+                    ? "bg-[#7c5dfa] text-white shadow-sm font-bold"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                <User className="w-3.5 h-3.5" />
-                <span>Usuario normal</span>
+                <User className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Usuario Regular</span>
               </button>
               <button
                 type="button"
                 onClick={() => setLoginType("institucion")}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   loginType === "institucion"
-                    ? "bg-[#7c5dfa] text-white shadow-sm"
+                    ? "bg-[#7c5dfa] text-white shadow-sm font-bold"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                <School className="w-3.5 h-3.5" />
-                <span>Estudiante de institución</span>
+                <School className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Estudiante de Institución</span>
               </button>
+            </div>
+          </div>
+
+          {/* Error alert */}
+          {errorMsg && (
+            <div className="my-2 p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-3.5 max-w-sm mx-auto w-full">
-            
-            {/* ============================================================= */}
-            {/* 1. REGISTRO (SOLO USUARIO NORMAL - SIN OPCIONES NI SELECTORES) */}
-            {/* ============================================================= */}
-            {mode === "register" && (
+          {/* Form Fields */}
+          <form onSubmit={handleSubmit} className="space-y-3 my-auto py-2">
+            {loginType === "institucion" ? (
               <>
                 <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Nombre completo
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                      placeholder="Tu nombre completo"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Correo electrónico
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                      placeholder="correo@ejemplo.com"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Contraseña
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-10 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                      placeholder="Mínimo 6 caracteres"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-1 text-slate-500 hover:text-white absolute right-3 top-1/2 -translate-y-1/2 transition"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {errorMsg && (
-                  <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-2.5 rounded-xl bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white font-semibold text-xs sm:text-sm shadow-md shadow-[#7c5dfa]/20 transition active:scale-[0.99] flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Creando cuenta en Dalat...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Crear cuenta</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-
-            {/* ============================================================= */}
-            {/* 2. LOGIN: USUARIO NORMAL                                      */}
-            {/* ============================================================= */}
-            {mode === "login" && loginType === "normal" && (
-              <>
-                <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Correo electrónico
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                      placeholder="correo@ejemplo.com"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Contraseña
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-10 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-1 text-slate-500 hover:text-white absolute right-3 top-1/2 -translate-y-1/2 transition"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs pt-0.5">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-400 select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded bg-[#070914] border-[#1b223d] text-[#7c5dfa] focus:ring-0 accent-[#7c5dfa] w-3.5 h-3.5 cursor-pointer"
-                    />
-                    <span className="text-[12px]">Recordarme</span>
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setForgotModalOpen(true)}
-                    className="text-[11px] text-[#a78bfa] hover:text-white transition font-medium"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </div>
-
-                {errorMsg && (
-                  <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-2.5 rounded-xl bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white font-semibold text-xs sm:text-sm shadow-md shadow-[#7c5dfa]/20 transition active:scale-[0.99] flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Iniciando sesión...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Iniciar sesión</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-
-            {/* ============================================================= */}
-            {/* 3. LOGIN: ESTUDIANTE DE INSTITUCIÓN (CON SELECTOR DE INSTITUTO)*/}
-            {/* ============================================================= */}
-            {mode === "login" && loginType === "institucion" && (
-              <>
-                {/* SELECTOR DE INSTITUCIÓN OBLIGATORIO */}
-                <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Selecciona tu institución educativa
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <School className="w-4 h-4 text-[#a78bfa] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <label className="text-[11px] font-medium text-slate-300 block">Institución:</label>
+                  <div className="relative">
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                     <select
                       value={selectedInstitution}
                       onChange={(e) => setSelectedInstitution(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-8 py-2.5 text-xs sm:text-sm text-white focus:outline-none appearance-none cursor-pointer"
+                      className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white focus:outline-none focus:border-purple-400 appearance-none cursor-pointer"
                     >
-                      {INSTITUTIONS_LIST.map((inst) => (
-                        <option key={inst} value={inst} className="bg-[#0c0f1f] text-white">
-                          {inst}
+                      {INSTITUTIONS_LIST.map((u) => (
+                        <option key={u} value={u} className="bg-[#0b0e20] text-white">
+                          {u}
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
                   </div>
                 </div>
 
-                {/* Si selecciona "Otra institución...", escribir el nombre */}
                 {selectedInstitution === "Otra institución..." && (
-                  <div className="space-y-1 animate-in fade-in duration-150">
-                    <label className="block text-slate-400 text-xs font-medium">
-                      Nombre de tu universidad o colegio
-                    </label>
-                    <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                      <Building2 className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        required
-                        value={customInstitution}
-                        onChange={(e) => setCustomInstitution(e.target.value)}
-                        className="w-full bg-transparent pl-10 pr-3.5 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none"
-                        placeholder="Ej. Universidad de Cartagena"
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-slate-300 block">Nombre de tu institución:</label>
+                    <input
+                      type="text"
+                      required
+                      value={customInstitution}
+                      onChange={(e) => setCustomInstitution(e.target.value)}
+                      placeholder="Ej: Universidad de Caldas"
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                    />
                   </div>
                 )}
 
                 <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Correo institucional
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <label className="text-[11px] font-medium text-slate-300 block">Correo institucional (.edu.co):</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                     <input
                       type="email"
                       required
                       value={institutionalEmail}
                       onChange={(e) => setInstitutionalEmail(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                      placeholder="tu.correo@universidad.edu.co"
+                      placeholder="estudiante@unal.edu.co"
+                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
                     />
                   </div>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-400 text-xs font-medium">
-                    Contraseña institucional
-                  </label>
-                  <div className="relative bg-[#070914] border border-[#1b223d] rounded-xl focus-within:border-[#7c5dfa] transition">
-                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-transparent pl-10 pr-10 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-1 text-slate-500 hover:text-white absolute right-3 top-1/2 -translate-y-1/2 transition"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs pt-0.5">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-400 select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded bg-[#070914] border-[#1b223d] text-[#7c5dfa] focus:ring-0 accent-[#7c5dfa] w-3.5 h-3.5 cursor-pointer"
-                    />
-                    <span className="text-[12px]">Recordarme</span>
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setForgotModalOpen(true)}
-                    className="text-[11px] text-[#a78bfa] hover:text-white transition font-medium"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </div>
-
-                {errorMsg && (
-                  <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#7c5dfa] to-[#5e38d6] hover:from-[#6c4ae8] hover:to-[#4e2bbd] text-white font-semibold text-xs sm:text-sm shadow-md shadow-[#7c5dfa]/20 transition active:scale-[0.99] flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Validando convenio institucional...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Iniciar sesión institucional</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
               </>
+            ) : (
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-300 block">Correo electrónico:</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="andrea@universidad.edu.co"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+              </div>
             )}
-          </form>
 
-          {/* Social or SSO Icons */}
-          <div className="max-w-sm mx-auto w-full pt-4 space-y-3.5">
-            <div className="relative flex items-center">
-              <div className="flex-grow border-t border-[#171c33]" />
-              <span className="flex-shrink mx-3 text-slate-500 text-[11px]">
-                {mode === "login" && loginType === "institucion"
-                  ? "o ingresar con SSO universitario"
-                  : "o continuar con"}
-              </span>
-              <div className="flex-grow border-t border-[#171c33]" />
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-medium text-slate-300">Contraseña:</label>
+                <button
+                  type="button"
+                  onClick={() => setForgotModalOpen(true)}
+                  className="text-[11px] text-purple-400 hover:text-purple-300 transition cursor-pointer"
+                >
+                  ¿La olvidaste?
+                </button>
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-white transition cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <label className="flex items-center gap-2 text-slate-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded bg-[#070914] border-white/20 text-purple-600 focus:ring-0 focus:ring-offset-0"
+                />
+                <span>Recordarme</span>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 rounded-xl bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white font-bold text-xs tracking-wide shadow-lg shadow-purple-900/40 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-60"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Autenticando...</span>
+                </>
+              ) : (
+                <>
+                  <span>Iniciar Sesión</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Social Icons row (Circular buttons: Gmail / Google, Facebook, GitHub, LinkedIn) */}
+          <div className="space-y-2 pt-2 text-center">
+            <span className="text-[11px] text-slate-400 block font-medium">o ingresa con tu cuenta</span>
             <div className="flex items-center justify-center gap-3">
-              {/* Google */}
+              {/* Google / Gmail */}
               <button
                 type="button"
                 onClick={() => handleSocialLogin("Google")}
-                className="w-10 h-10 rounded-xl bg-[#12162a] hover:bg-[#1a203a] border border-[#202746] transition flex items-center justify-center active:scale-95"
-                title="Google Workspace"
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
+                title="Ingresar con Google / Gmail"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.8C6.5 7.4 9 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.8c2.2-2 3.7-5 3.7-8.7z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.6 14.8c-.3-.8-.4-1.8-.4-2.8s.1-2 .4-2.8L1.9 6.4C.7 8.8 0 11.3 0 14s.7 5.2 1.9 7.6l3.7-2.8v-4z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.8 5.6 7 10.1 7z"
+                  />
                 </svg>
               </button>
 
-              {/* Microsoft / Outlook */}
+              {/* Facebook */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("Microsoft")}
-                className="w-10 h-10 rounded-xl bg-[#12162a] hover:bg-[#1a203a] border border-[#202746] transition flex items-center justify-center active:scale-95"
-                title="Microsoft 365"
+                onClick={() => handleSocialLogin("Facebook")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                title="Ingresar con Facebook"
               >
-                <svg className="w-4 h-4" viewBox="0 0 23 23">
-                  <path fill="#f35325" d="M1 1h10v10H1z" />
-                  <path fill="#81bc06" d="M12 1h10v10H12z" />
-                  <path fill="#05a6f0" d="M1 12h10v10H1z" />
-                  <path fill="#ffba08" d="M12 12h10v10H12z" />
+                <span className="font-bold text-sm leading-none">f</span>
+              </button>
+
+              {/* GitHub */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin("GitHub")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                title="Ingresar con GitHub"
+              >
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
                 </svg>
               </button>
 
-              {/* Apple (Only for normal user or register) */}
-              {(mode === "register" || loginType === "normal") && (
-                <button
-                  type="button"
-                  onClick={() => handleSocialLogin("Apple")}
-                  className="w-10 h-10 rounded-xl bg-[#12162a] hover:bg-[#1a203a] border border-[#202746] transition flex items-center justify-center active:scale-95"
-                  title="Apple"
-                >
-                  <svg className="w-4 h-4 fill-white" viewBox="0 0 170 170">
-                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.04-7.58-7.71-11.65-14.01-6.19-9.57-11.06-20.44-14.61-32.61-3.55-12.18-5.33-23.77-5.33-34.78 0-14.8 3.58-27.18 10.74-37.14 7.17-9.97 16.32-15.06 27.46-15.28 4.58 0 9.8 1.25 15.66 3.76 5.86 2.51 9.8 3.86 11.82 4.07 1.85-.21 6.01-1.63 12.48-4.28 6.47-2.64 12.04-3.86 16.71-3.65 12.85.63 23.01 4.75 30.48 12.37-11.06 6.74-16.48 15.93-16.27 27.56.21 9.35 3.82 17.18 10.82 23.51 7 6.33 15.34 9.97 25.02 10.92-2.12 6.74-4.88 13.78-8.28 21.13zM119.22 31.84c0-7.39 2.65-14.19 7.95-20.39 5.3-6.2 11.82-10.15 19.57-11.85.21 1.06.32 2.12.32 3.18 0 7.39-2.75 14.39-8.26 20.98-5.51 6.59-12.18 10.36-20.02 11.31-.21-1.06-.32-2.12-.32-3.18z" />
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            {/* Switchers & Demo */}
-            <div className="text-center text-xs text-slate-400 pt-1 space-y-1.5">
-              {mode === "login" ? (
-                <p>
-                  ¿No tienes una cuenta aún?{" "}
-                  <button
-                    type="button"
-                    onClick={() => setMode("register")}
-                    className="text-[#a78bfa] font-semibold hover:underline transition"
-                  >
-                    Registrarse
-                  </button>
-                </p>
-              ) : (
-                <p>
-                  ¿Ya tienes una cuenta?{" "}
-                  <button
-                    type="button"
-                    onClick={() => setMode("login")}
-                    className="text-[#a78bfa] font-semibold hover:underline transition"
-                  >
-                    Iniciar sesión
-                  </button>
-                </p>
-              )}
-
+              {/* LinkedIn */}
               <button
                 type="button"
-                onClick={handleQuickDemo}
-                className="text-[11px] text-slate-500 hover:text-slate-300 transition block mx-auto hover:underline"
+                onClick={() => handleSocialLogin("LinkedIn")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                title="Ingresar con LinkedIn"
               >
-                {mode === "login" && loginType === "institucion"
-                  ? "o probar con institución demo"
-                  : "o entrar en modo demo"}
+                <span className="font-bold text-xs leading-none">in</span>
               </button>
             </div>
           </div>
         </div>
+
+        {/* ===================================================================== */}
+        {/* FORM 2: REGISTRO (Right 50% in Desktop)                               */}
+        {/* ===================================================================== */}
+        <div
+          className={`w-full lg:w-1/2 p-6 sm:p-10 flex flex-col justify-between transition-all duration-700 ease-[cubic-bezier(0.77,0,0.175,1)] ${
+            mode === "register"
+              ? "opacity-100 translate-x-0 pointer-events-auto z-10"
+              : "opacity-0 translate-x-12 pointer-events-none absolute lg:static"
+          }`}
+        >
+          {/* Logo Dalat Oficial con imagen */}
+          <div className="text-center space-y-2">
+            <Image
+              src="/dalat-logo-v2.png"
+              alt="Dalat"
+              width={140}
+              height={44}
+              className="h-10 sm:h-11 w-auto object-contain mx-auto"
+              priority
+            />
+            <h2 className="text-2xl sm:text-3xl font-editorial font-bold text-white tracking-tight">
+              Crear tu Cuenta
+            </h2>
+
+            {/* Mobile Switcher */}
+            <div className="lg:hidden pt-1">
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="text-xs font-bold text-cyan-400 hover:text-cyan-300"
+              >
+                &larr; ¿Ya tienes cuenta? Inicia sesión
+              </button>
+            </div>
+          </div>
+
+          {/* Error alert */}
+          {errorMsg && (
+            <div className="my-2 p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Form Fields */}
+          <form onSubmit={handleSubmit} className="space-y-3 my-auto py-2">
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-300 block">Nombre completo:</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Andrea Gómez"
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-300 block">Correo universitario o personal:</label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="andrea@universidad.edu.co"
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-300 block">Contraseña:</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-white transition cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-[#7c5dfa] hover:from-cyan-600 hover:to-[#6c4ae8] text-white font-bold text-xs tracking-wide shadow-lg shadow-cyan-900/30 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-60"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Creando tu cuenta...</span>
+                </>
+              ) : (
+                <>
+                  <span>Registrarme y Comenzar</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Social Icons row (Circular buttons: Gmail / Google, Facebook, GitHub, LinkedIn) */}
+          <div className="space-y-2 pt-2 text-center">
+            <span className="text-[11px] text-slate-400 block font-medium">o regístrate con tu cuenta</span>
+            <div className="flex items-center justify-center gap-3">
+              {/* Google / Gmail */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin("Google")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
+                title="Registrarse con Google / Gmail"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.8C6.5 7.4 9 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.8c2.2-2 3.7-5 3.7-8.7z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.6 14.8c-.3-.8-.4-1.8-.4-2.8s.1-2 .4-2.8L1.9 6.4C.7 8.8 0 11.3 0 14s.7 5.2 1.9 7.6l3.7-2.8v-4z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.8 5.6 7 10.1 7z"
+                  />
+                </svg>
+              </button>
+
+              {/* Facebook */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin("Facebook")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                title="Registrarse con Facebook"
+              >
+                <span className="font-bold text-sm leading-none">f</span>
+              </button>
+
+              {/* GitHub */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin("GitHub")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                title="Registrarse con GitHub"
+              >
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+              </button>
+
+              {/* LinkedIn */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin("LinkedIn")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                title="Registrarse con LinkedIn"
+              >
+                <span className="font-bold text-xs leading-none">in</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ===================================================================== */}
+        {/* THE SLIDING OVERLAY PANEL (DESKTOP DOUBLE SLIDER)                     */}
+        {/* ===================================================================== */}
+        <div
+          className={`hidden lg:block absolute top-0 left-0 w-1/2 h-full z-20 pointer-events-auto transition-transform duration-700 ease-[cubic-bezier(0.77,0,0.175,1)] ${
+            mode === "login" ? "translate-x-full" : "translate-x-0"
+          }`}
+        >
+          <div
+            className={`relative w-full h-full border-l border-white/[0.08] overflow-hidden flex flex-col justify-center items-center p-8 sm:p-12 text-white select-none transition-all duration-700 ${
+              mode === "login"
+                ? "bg-gradient-to-br from-[#1e144a] via-[#351b75] to-[#5a25b2]"
+                : "bg-gradient-to-br from-[#0e1d44] via-[#1a3274] to-[#264b9e]"
+            }`}
+          >
+            {/* Subtle decorative glowing ambient shapes (CSS only, no heavy animations) */}
+            <div className="absolute top-10 right-10 w-44 h-44 rounded-full bg-white/[0.05] blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-10 -left-10 w-52 h-52 rounded-full bg-black/20 blur-2xl pointer-events-none" />
+
+            {/* Floating Clean Typography & Ghost Action Button */}
+            <div className="relative z-10 text-center max-w-sm mx-auto space-y-6">
+              {mode === "login" ? (
+                <>
+                  <div className="space-y-3">
+                    <h3 className="text-3xl sm:text-4xl font-editorial font-bold text-white tracking-tight leading-tight">
+                      Comienza tu <br />
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-200 via-purple-100 to-cyan-200">
+                        viaje ahora.
+                      </span>
+                    </h3>
+                    <p className="text-xs sm:text-[13px] text-indigo-100/80 leading-relaxed max-w-xs mx-auto font-medium">
+                      Si aún no tienes una cuenta, únete a Dalat y transforma tu rendimiento académico con neurociencia e IA.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMsg(null);
+                      setMode("register");
+                    }}
+                    className="py-3 px-10 rounded-full border-2 border-white text-white hover:bg-white hover:text-[#0b0e20] font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-purple-950/40 active:scale-95 cursor-pointer"
+                  >
+                    Registrarme
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <h3 className="text-3xl sm:text-4xl font-editorial font-bold text-white tracking-tight leading-tight">
+                      ¡Bienvenido <br />
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-indigo-100 to-fuchsia-200">
+                        de nuevo!
+                      </span>
+                    </h3>
+                    <p className="text-xs sm:text-[13px] text-indigo-100/80 leading-relaxed max-w-xs mx-auto font-medium">
+                      Para mantenerte conectado con tus materias, horarios y cortes de notas, inicia sesión aquí.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMsg(null);
+                      setMode("login");
+                    }}
+                    className="py-3 px-10 rounded-full border-2 border-white text-white hover:bg-white hover:text-[#0b0e20] font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-indigo-950/40 active:scale-95 cursor-pointer"
+                  >
+                    Iniciar Sesión
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Forgot Password Modal */}
       {forgotModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm p-6 rounded-2xl bg-[#0e1122] border border-[#232948] shadow-2xl space-y-4 text-left">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="w-full max-w-sm p-6 rounded-2xl bg-[#0e1124] border border-[#232948] shadow-2xl space-y-4 text-left">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center font-bold">
                 <KeyRound className="w-4 h-4" />
               </div>
               <div>
@@ -727,8 +715,8 @@ export default function LoginScreen({
                     required
                     value={recoveryEmail}
                     onChange={(e) => setRecoveryEmail(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#080a15] border border-[#1e2544] text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#7c5dfa]"
-                    placeholder="tu.correo@universidad.edu"
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#080a15] border border-white/[0.1] text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-400"
+                    placeholder="tu.correo@universidad.edu.co"
                   />
                 </div>
 
@@ -736,13 +724,13 @@ export default function LoginScreen({
                   <button
                     type="button"
                     onClick={() => setForgotModalOpen(false)}
-                    className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white transition"
+                    className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white transition cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 rounded-lg bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white text-xs font-semibold shadow-md transition"
+                    className="px-4 py-1.5 rounded-lg bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white text-xs font-semibold shadow-md transition cursor-pointer"
                   >
                     Enviar enlace
                   </button>

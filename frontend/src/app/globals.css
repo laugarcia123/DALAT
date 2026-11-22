@@ -1,7 +1,12 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Outfit:wght@500;600;700&display=swap');
 
 .font-editorial {
   font-family: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+.font-badge {
+  font-family: "Plus Jakarta Sans", "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
 }
 
 :root {
@@ -12,4 +17,498 @@
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* ========================================================================= */
+/* Metodología Dalat: Scroll interactivo de palabras (Inspirado en Jhey)      */
+/* ========================================================================= */
+.dalat-word-section {
+  --start: 50vh;
+  --accent: #c084fc;
+  --accent-last: #f472b6;
+  --dimmed: rgba(148, 163, 184, 0.32);
+  --lh: 1.35em;
+  position: relative;
+  width: 100%;
+  /* Fondo semitransparente con degradado: se funde con las partículas sin cortes */
+  background: linear-gradient(
+    180deg,
+    rgba(8, 10, 17, 0) 0%,
+    rgba(8, 10, 17, 0.4) 12%,
+    rgba(10, 8, 24, 0.45) 50%,
+    rgba(8, 10, 17, 0.4) 88%,
+    rgba(8, 10, 17, 0) 100%
+  );
+}
+
+.dalat-word-scroll-inner {
+  line-height: 1.35;
+  font-size: clamp(2.4rem, 6vw, 4.8rem);
+  font-weight: 900;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  padding-top: 1.5rem;
+  padding-bottom: calc(var(--start) - 0.5 * var(--lh));
+}
+
+.dalat-word-prefix {
+  position: sticky;
+  top: calc(var(--start) - 0.5 * var(--lh));
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 900;
+  margin: 0;
+  display: inline-block;
+  height: fit-content;
+  color: #ffffff;
+  white-space: nowrap;
+  letter-spacing: -0.03em;
+}
+
+.dalat-word-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.dalat-word-list li {
+  line-height: inherit;
+  background: linear-gradient(
+    180deg,
+    var(--dimmed) 0 calc(var(--start) - 0.55 * var(--lh)),
+    var(--accent) calc(var(--start) - 0.48 * var(--lh)) calc(var(--start) + 0.48 * var(--lh)),
+    var(--dimmed) calc(var(--start) + 0.55 * var(--lh))
+  );
+  background-attachment: fixed;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  white-space: nowrap;
+  scroll-snap-align: center;
+}
+
+.dalat-word-list li.is-last {
+  background: linear-gradient(
+    180deg,
+    var(--dimmed) 0 calc(var(--start) - 0.55 * var(--lh)),
+    var(--accent-last) calc(var(--start) - 0.48 * var(--lh)) calc(var(--start) + 0.48 * var(--lh)),
+    var(--dimmed) calc(var(--start) + 0.55 * var(--lh))
+  );
+  background-attachment: fixed;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ========================================================================= */
+/* Tema Claro (Light Mode) con estándares UI/UX Pro Max                      */
+/* ========================================================================= */
+.theme-light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.theme-light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light header img[alt="Dalat"] {
+  filter: brightness(0);
+}
+
+.theme-light nav {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light nav button {
+  color: #64748b !important;
+}
+
+.theme-light nav button:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light nav button.bg-\[\#271d49\] {
+  background-color: #f3e8ff !important;
+  color: #7e22ce !important;
+  border-color: #d8b4fe !important;
+}
+
+.theme-light .rounded-2xl.bg-\[\#0c0e18\],
+.theme-light aside .bg-\[\#0c0e18\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.theme-light form.bg-\[\#0c0e18\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+.theme-light form input {
+  color: #0f172a !important;
+}
+
+.theme-light form input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.theme-light form select,
+.theme-light form button[type="button"]:not(.dropdown-item):not([role="menuitem"]):not(.color-swatch-btn):not(.session-type-btn):not(.day-chip-btn):not([data-swatch]):not([style*="background"]) {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+/* Color swatches de avatares y selectores de color (siempre visibles y vibrantes) */
+[data-swatch],
+button[data-swatch],
+.color-swatch-btn {
+  background-color: var(--swatch-color, #7c3aed) !important;
+  border: 2px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Menús desplegables / Dropdowns sin bordes internos en los ítems */
+.dropdown-item,
+[role="menuitem"],
+button.dropdown-item,
+button[role="menuitem"],
+.theme-light form button.dropdown-item,
+.theme-light form button[role="menuitem"],
+.theme-light [role="menu"] button,
+[role="menu"] button {
+  background-color: transparent !important;
+  border: none !important;
+  border-width: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.theme-light .dropdown-item:hover,
+.theme-light [role="menuitem"]:hover,
+.theme-light [role="menu"] button:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.theme-light .dropdown-item.is-active,
+.theme-light [role="menuitem"].is-active,
+.theme-light [role="menu"] button.is-active {
+  background-color: #f3e8ff !important;
+  color: #7e22ce !important;
+}
+
+/* Evitar deformación de iconos SVG de línea / polilíneas (como Check) */
+svg polyline,
+svg line {
+  fill: none !important;
+}
+
+.theme-light .bg-\[\#0a0d18\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+.theme-light .bg-\[\#090b14\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light .bg-\[\#101322\],
+.theme-light .bg-\[\#0e111d\],
+.theme-light .bg-\[\#0c0e18\],
+.theme-light .bg-\[\#141829\],
+.theme-light .bg-\[\#121526\],
+.theme-light .bg-\[\#111425\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+}
+
+.theme-light h1:not(button *),
+.theme-light h2:not(button *),
+.theme-light h3:not(button *),
+.theme-light h4:not(button *),
+.theme-light p:not(button *),
+.theme-light span.text-white:not(button *):not([style*="background-color"]):not([data-avatar]):not([data-avatar] *) {
+  color: #0f172a !important;
+}
+
+/* ========================================================================= */
+/* BOTONES EN MODO CLARO: Colores suavizados + Texto e iconos en BLANCO PURO  */
+/* ========================================================================= */
+.theme-light button.bg-gradient-to-r:not([class*="from-red-"]):not([class*="from-rose-"]),
+.theme-light button[type="submit"]:not([class*="from-red-"]):not([class*="from-rose-"]),
+.theme-light button.bg-purple-600,
+.theme-light button.bg-indigo-600,
+.theme-light .btn-primary {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid transparent !important;
+  box-shadow: 0 4px 14px -1px rgba(139, 92, 246, 0.28) !important;
+}
+
+.theme-light button[class*="from-red-"],
+.theme-light button[class*="from-rose-"] {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #e11d48 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid transparent !important;
+  box-shadow: 0 4px 14px -1px rgba(220, 38, 38, 0.35) !important;
+}
+
+.theme-light button.bg-gradient-to-r *,
+.theme-light button[type="submit"] *,
+.theme-light button.bg-purple-600 *,
+.theme-light button.bg-indigo-600 *,
+.theme-light .btn-primary * {
+  color: #ffffff !important;
+}
+
+.theme-light button.bg-gradient-to-r svg.fill-current,
+.theme-light button[type="submit"] svg.fill-current,
+.theme-light button.bg-purple-600 svg.fill-current,
+.theme-light button.bg-indigo-600 svg.fill-current,
+.theme-light .btn-primary svg.fill-current {
+  fill: #ffffff !important;
+}
+
+.theme-light button.bg-gradient-to-r:hover:not([class*="from-red-"]):not([class*="from-rose-"]),
+.theme-light button[type="submit"]:hover:not([class*="from-red-"]):not([class*="from-rose-"]),
+.theme-light .btn-primary:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important;
+  box-shadow: 0 6px 18px -1px rgba(139, 92, 246, 0.35) !important;
+}
+
+.theme-light button[class*="from-red-"]:hover,
+.theme-light button[class*="from-rose-"]:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #be123c 100%) !important;
+  box-shadow: 0 6px 18px -1px rgba(220, 38, 38, 0.45) !important;
+}
+
+/* Píldoras de control Kanban: Plegar todas y 9 pendientes */
+.theme-light .bg-\[\#121627\],
+.theme-light .border-\[\#1d233c\] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+.theme-light .bg-\[\#121627\] * {
+  color: #475569 !important;
+}
+
+/* Botón menú móvil (hamburguesa) en barra superior */
+.theme-light header button.p-2,
+.theme-light header button.lg\:hidden {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+/* ========================================================================= */
+/* PAISAJE ACÚSTICO EN MODO CLARO: Contraste y legibilidad de etiquetas      */
+/* ========================================================================= */
+.theme-light .bg-purple-950\/20 {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.08) !important;
+}
+
+.theme-light .bg-purple-950\/20 span,
+.theme-light .bg-purple-950\/20 h4 {
+  color: #7e22ce !important;
+}
+
+.theme-light .text-purple-300\/80,
+.theme-light .text-purple-300 {
+  color: #7e22ce !important;
+  font-weight: 600 !important;
+}
+
+/* Prevenir que textos se vuelvan blancos al hacer hover en Modo Claro */
+.theme-light .group:hover .group-hover\:text-white:not(button.bg-gradient-to-r *):not(button[type="submit"] *):not(.btn-primary *),
+.theme-light .hover\:text-white:hover:not(button.bg-gradient-to-r *):not(button[type="submit"] *):not(.btn-primary *) {
+  color: #0f172a !important;
+}
+
+/* ========================================================================= */
+/* MICRO-REPASO DEL DÍA EN MODO CLARO: Contraste óptimo                      */
+/* ========================================================================= */
+.theme-light .bg-\[\#090b14\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light .text-purple-200 {
+  color: #7e22ce !important;
+}
+
+.theme-light span.bg-white\/\[0\.06\] {
+  background-color: #f3e8ff !important;
+  color: #7e22ce !important;
+  border-color: #e9d5ff !important;
+}
+
+/* Textos generales */
+
+.theme-light .text-slate-100,
+.theme-light .text-slate-200,
+.theme-light .text-slate-300 {
+  color: #334155 !important;
+}
+
+.theme-light .text-slate-400,
+.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+.theme-light .bg-\[\#111326\],
+.theme-light .bg-\[\#111424\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light .border-white\/\[0\.08\],
+.theme-light .border-white\/\[0\.06\],
+.theme-light .border-white\/\[0\.10\],
+.theme-light .border-white\/\[0\.12\],
+.theme-light .border-white\/\[0\.14\],
+.theme-light .border-white\/\[0\.16\],
+.theme-light .border-white\/\[0\.18\] {
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light .bg-white\/\[0\.04\],
+.theme-light .bg-white\/\[0\.06\],
+.theme-light .bg-white\/\[0\.08\] {
+  background-color: #f1f5f9 !important;
+}
+
+/* Light mode for Banner - Tono Lavanda Pastel Sereno */
+.theme-light .rounded-3xl.bg-gradient-to-r {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #ede9fe 100%) !important;
+  border-color: #e9d5ff !important;
+  box-shadow: 0 10px 25px -5px rgba(168, 85, 247, 0.08) !important;
+}
+
+.theme-light .rounded-3xl.bg-gradient-to-r h1 {
+  color: #581c87 !important;
+}
+
+.theme-light .rounded-3xl.bg-gradient-to-r p {
+  color: #6b21a8 !important;
+}
+
+.theme-light .rounded-3xl.bg-gradient-to-r .bg-white\/\[0\.06\],
+.theme-light .rounded-3xl.bg-gradient-to-r .bg-white\/\[0\.08\] {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #d8b4fe !important;
+  color: #7e22ce !important;
+}
+
+.theme-light .rounded-3xl.bg-gradient-to-r .text-purple-200 {
+  color: #7e22ce !important;
+}
+
+.theme-light .rounded-3xl.bg-gradient-to-r strong {
+  color: #581c87 !important;
+}
+
+.theme-light path[stroke="#1a1e31"] {
+  stroke: #e2e8f0 !important;
+}
+
+/* ========================================================================= */
+/* PESTAÑA NOTAS EN MODO CLARO: Respaldo CSS garantizado                     */
+/* ========================================================================= */
+.theme-light .bg-\[\#080911\] {
+  background-color: #f3e8ff !important;
+  border-color: #e9d5ff !important;
+  color: #581c87 !important;
+}
+
+.theme-light .bg-\[\#080911\] span {
+  color: #581c87 !important;
+}
+
+.theme-light .bg-\[\#080911\] .text-\[\#818cf8\] {
+  color: #7e22ce !important;
+}
+
+.theme-light .bg-\[\#1a1f33\] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.theme-light .bg-\[\#1a1f33\] * {
+  color: #334155 !important;
+}
+
+.theme-light .bg-\[\#101322\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light .bg-\[\#101322\] input {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light div.text-white:not(button.bg-gradient-to-r *):not(button[type="submit"] *):not(.btn-primary *):not([data-avatar]):not([data-avatar] *):not([style*="background-color"]):not([style*="background-color"] *),
+.theme-light .truncate.text-white:not([data-avatar]):not([data-avatar] *) {
+  color: #0f172a !important;
+}
+
+/* ========================================================================= */
+/* AVATAR DE USUARIO: Letra inicial siempre blanca en modo claro y oscuro    */
+/* ========================================================================= */
+.theme-light [data-avatar],
+.theme-light [data-avatar] *,
+.theme-light .avatar-text {
+  color: #ffffff !important;
+}
+
+/* ========================================================================= */
+/* PESTAÑA RECURSOS IA EN MODO CLARO: Respaldo CSS                           */
+/* ========================================================================= */
+.theme-light .bg-\[\#121626\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+.theme-light .bg-\[\#121626\] * {
+  color: #334155 !important;
+}
+
+.theme-light .bg-\[\#080912\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light select {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
 }

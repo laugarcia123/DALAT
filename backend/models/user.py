@@ -38,6 +38,6 @@ class Usuario(Base):
     fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relación con asignaturas académicas
-    asignaturas: Mapped[List["Asignatura"]] = relationship(
+    asignaturas: Mapped[List["AsignÑatura"]] = relationship(
         "Asignatura", back_populates="usuario", cascade="all, delete-orphan"
     )

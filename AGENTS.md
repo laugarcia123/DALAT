@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+
+## Regla de Diseño UI/UX: UI/UX Pro Max Obligatorio
+
+En este proyecto, toda modificación visual, creación de pantallas, tarjetas, botones, estados de carga, paletas o rediseños de experiencia de usuario DEBE consultar y aplicar la skill local `ui-ux-pro-max`:
+- Script CLI: `python .agents/skills/ui-ux-pro-max/scripts/search.py`
+- Consultar lineamientos con `--domain ux`, `--stack nextjs`, `--stack html-tailwind` o `--design-system`.
+- No asumir estilos ni omitir la validación de accesibilidad, microinteracciones y densidad visual que provee la skill.

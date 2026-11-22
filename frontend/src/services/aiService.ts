@@ -65,4 +65,32 @@ export const aiService = {
       requiresAuth: true,
     });
   },
+
+  /**
+   * Sube un archivo real desde el ordenador del estudiante para generar recursos con IA
+   */
+  async subirMaterial(
+    file: File,
+    materia?: string
+  ): Promise<{
+    id: string;
+    name: string;
+    subject: string;
+    size: string;
+    type: "pdf" | "docx" | "txt";
+    preview_text?: string;
+    message?: string;
+  }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (materia) {
+      formData.append("materia", materia);
+    }
+
+    return apiFetch("/ia/subir-material", {
+      method: "POST",
+      body: formData,
+      requiresAuth: false,
+    });
+  },
 };
