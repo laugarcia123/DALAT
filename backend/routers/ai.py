@@ -4,11 +4,46 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from db.database import get_db
 from models.user import Usuario
+from models.repository import DocumentoRepositorio
 from core.deps import get_optional_user, get_current_user
 from schemas.ai_resource import GenerarRecursoRequest, GenerarRecursoResponse
 from services.ai_service import AIService
 
 router = APIRouter(prefix="/ia", tags=["Recursos de Estudio con IA"])
+
+
+def get_credits_by_file_size(tamano_str: Optional[str]) -> int:
+    """
+    Tabla oficial de créditos Dalat por peso del archivo:
+    - Hasta 10 MB: 2 créditos
+    - 10 MB a 25 MB: 4 créditos
+    - 25 MB a 40 MB: 7 créditos
+    - Más de 40 MB: 10 créditos
+    """
+    if not tamano_str:
+        return 2
+    t = tamano_str.upper().strip()
+    mb = 1.0
+    try:
+        if "MB" in t:
+            mb = float(t.replace("MB", "").strip())
+        elif "KB" in t:
+            mb = float(t.replace("KB", "").strip()) / 1024.0
+        elif "GB" in t:
+            mb = float(t.replace("GB", "").strip()) * 1024.0
+        else:
+            mb = float(t)
+    except Exception:
+        mb = 1.0
+
+    if mb <= 10.0:
+        return 2
+    elif mb <= 25.0:
+        return 4
+    elif mb <= 40.0:
+        return 7
+    else:
+        return 10
 
 
 @router.post("/generar-recurso", response_model=GenerarRecursoResponse)
@@ -30,22 +65,9 @@ def generar_recurso_estudio(
         user_id=user_id,
     )
 
-    # Descontar tokens del usuario únicamente cuando la generación es exitosa
-    if current_user:
-        costos = {
-            "Examen": 1 if req.dificultad and "Opción 1" in req.dificultad else 3,
-            "Flashcards": 1 if req.dificultad and "Opción 1" in req.dificultad else 2,
-            "Resumen": 1 if req.dificultad and "Opción 1" in req.dificultad else 3,
-            "Guia": 4,
-            "Pack_General": 2,      # Pack 1 con descuento: 2 tokens (antes 3)
-            "Pack_Matematicas": 7,  # Pack 2 con descuento: 7 tokens (antes 10)
-            "Psicopata": 0,         # Ya descontado explícitamente vía /api/users/deduct-tokens
-        }
-        costo = costos.get(req.tipo_recurso, 2)
-        current_user.tokens_disponibles = max(0, (current_user.tokens_disponibles or 0) - costo)
-        db.commit()
-        db.refresh(current_user)
-
+    # La deducción de tokens se gestiona de forma centralizada y transparente
+    # vía /api/users/deduct-tokens según la tabla oficial por peso de archivo:
+    # Hasta 10 MB: 2 créditos | 10 MB a 25 MB: 4 créditos | 25 MB a 40 MB: 7 créditos | > 40 MB: 10 créditos
     return GenerarRecursoResponse(
         id_recurso=f"rec_{int(elapsed_ms)}_{hash(req.tema) % 10000}",
         tipo_recurso=req.tipo_recurso,

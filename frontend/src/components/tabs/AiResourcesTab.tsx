@@ -31,9 +31,16 @@ import {
   FileArchive,
   Package,
   Download,
+  Info,
+  Coins,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { exportExamToPDF, exportFlashcardsToPDF } from "@/lib/pdfExport";
+import {
+  getCreditsByFileSize,
+  getFileTierInfo,
+  DALAT_FILE_CREDIT_TIERS,
+} from "@/lib/creditRules";
 import StudyGuideRenderer from "./StudyGuideRenderer";
 import { useAuth } from "@/context/AuthContext";
 import { flashcardStorage } from "@/services/flashcardStorage";
@@ -108,25 +115,24 @@ export type ResourceType =
 
 export function calculateTokenCost(
   resourceType: ResourceType,
-  engineOption: EngineOptionId
+  engineOption: EngineOptionId,
+  fileSize?: string | number | null
 ): number {
-  if (resourceType === "Pack_General") return 2; // Pack 1 (Examen + Flashcards + Resumen): 2 tokens (Ahorras 1 token)
-  if (resourceType === "Pack_Matematicas") return 7; // Pack 2 (Guía + Resumen + Examen Opción 2): 7 tokens (Ahorras 3 tokens)
+  const baseCredits = getCreditsByFileSize(fileSize);
 
-  if (engineOption === "opcion_1") {
-    // Opción 1: Exámenes (1), Flashcards (1), Resúmenes (1), Guía solo en Opción 2
-    if (resourceType === "Examen") return 1;
-    if (resourceType === "Flashcards") return 1;
-    if (resourceType === "Resumen") return 1;
-    return 4;
-  } else {
-    // Opción 2: Exámenes (3), Resúmenes (3), Flashcards (2), Guía (4)
-    if (resourceType === "Examen") return 3;
-    if (resourceType === "Resumen") return 3;
-    if (resourceType === "Flashcards") return 2;
-    if (resourceType === "Guia") return 4;
-    return 3;
+  if (resourceType === "Pack_General") {
+    // Pack 1 (Examen + Flashcards + Resumen): 3 recursos con ahorro especial
+    return Math.max(3, Math.round(baseCredits * 1.8));
   }
+  if (resourceType === "Pack_Matematicas") {
+    // Pack 2 (Guía + Resumen + Examen Opción 2): recursos cuantitativos avanzados
+    return Math.max(5, Math.round(baseCredits * 2.2));
+  }
+
+  // Para recursos individuales (Examen, Flashcards, Resumen, Guía):
+  // Rige la tabla oficial según peso de archivo:
+  // <= 10 MB: 2 créditos | 10-25 MB: 4 créditos | 25-40 MB: 7 créditos | > 40 MB: 10 créditos
+  return baseCredits;
 }
 
 const getDemoPreviewContent = (type: string): any => {
@@ -385,7 +391,19 @@ export default function AiResourcesTab({
       ? "opcion_2"
       : engineOption;
 
-  const currentTokenCost = calculateTokenCost(resourceType, effectiveEngineOption);
+  // Archivo seleccionado actualmente (con fallback seguro)
+  const selectedFile = files.find((f) => f.id === selectedFileId) || files[0] || {
+    id: "empty",
+    name: "Sin archivo seleccionado",
+    subject: "General",
+    size: "0 KB",
+    type: "pdf" as const,
+  };
+
+  const currentTokenCost = calculateTokenCost(resourceType, effectiveEngineOption, selectedFile?.size);
+  const selectedFileTier = getFileTierInfo(selectedFile?.size);
+  const [showCreditTiersModal, setShowCreditTiersModal] = useState(false);
+
   const [questionCount, setQuestionCount] = useState(5);
   const maxQuestionCount = resourceType === "Examen" ? 8 : 15;
   const [generating, setGenerating] = useState(false);
@@ -407,15 +425,6 @@ export default function AiResourcesTab({
 
   // Estado del Visor de Resumen / Guía
   const [copied, setCopied] = useState(false);
-
-  // Archivo seleccionado actualmente (con fallback seguro)
-  const selectedFile = files.find((f) => f.id === selectedFileId) || files[0] || {
-    id: "empty",
-    name: "Sin archivo seleccionado",
-    subject: "General",
-    size: "0 KB",
-    type: "pdf" as const,
-  };
 
   const handleDeleteFile = async (fileId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1073,8 +1082,19 @@ export default function AiResourcesTab({
               >
                 <span className="text-slate-400">Costo:</span>
                 <span className="font-extrabold text-sm text-purple-600 dark:text-purple-400 font-mono">
-                  {currentTokenCost} {currentTokenCost === 1 ? "token" : "tokens"}
+                  {currentTokenCost} {currentTokenCost === 1 ? "crédito" : "créditos"}
                 </span>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCreditTiersModal(true)}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border cursor-pointer hover:opacity-80 transition flex items-center gap-1 ${selectedFileTier.badgeColor}`}
+                  title="Ver tabla oficial de costos por peso de archivo"
+                >
+                  <span>{selectedFile.size || "≤ 10 MB"}</span>
+                  <Info className="w-2.5 h-2.5" />
+                </button>
+
                 {resourceType === "Pack_General" && (
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -1083,7 +1103,7 @@ export default function AiResourcesTab({
                         : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
                     }`}
                   >
-                    ¡Ahorras 1 token!
+                    Pack x3 con descuento
                   </span>
                 )}
                 {resourceType === "Pack_Matematicas" && (
@@ -1094,7 +1114,7 @@ export default function AiResourcesTab({
                         : "text-cyan-400 bg-cyan-500/10 border-cyan-500/20"
                     }`}
                   >
-                    ¡Ahorras 3 tokens!
+                    Pack Cuantitativo
                   </span>
                 )}
                 {isPro && (
@@ -2167,7 +2187,7 @@ export default function AiResourcesTab({
                               <div className="min-w-0">
                                 <h4 className="text-xs sm:text-sm font-bold truncate">{doc.nombre}</h4>
                                 <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                                  {currentRepo?.nombre} &bull; {doc.tamano || "1.0 MB"}
+                                  {currentRepo?.nombre} &bull; {doc.tamano || "1.0 MB"} &bull; <strong className="text-purple-400 font-semibold">{getCreditsByFileSize(doc.tamano)} créditos</strong>
                                 </p>
                               </div>
                             </div>
@@ -2221,6 +2241,80 @@ export default function AiResourcesTab({
                 }`}
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Informativo: Tarifas de Créditos por Peso del Archivo */}
+      {showCreditTiersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden ${
+              activeLight ? "bg-white border-slate-200 text-slate-900" : "bg-[#0d1020] border-purple-500/30 text-white"
+            }`}
+          >
+            <div className={`p-5 sm:p-6 border-b flex items-center justify-between ${activeLight ? "border-slate-100 bg-purple-50/40" : "border-white/[0.08] bg-white/[0.02]"}`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                  <Coins className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">Tarifas Oficiales de Créditos Dalat</h3>
+                  <p className="text-xs text-slate-400">Consumo de tokens según el peso del archivo procesado</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreditTiersModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="rounded-2xl border overflow-hidden border-slate-200 dark:border-white/[0.08]">
+                <table className="w-full text-left text-xs">
+                  <thead className={activeLight ? "bg-slate-100 text-slate-700" : "bg-white/[0.04] text-slate-300"}>
+                    <tr>
+                      <th className="p-3 font-bold">Peso del PDF / Archivo</th>
+                      <th className="p-3 font-bold">Tipo típico</th>
+                      <th className="p-3 font-bold text-right">Costo (por recurso)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
+                    {DALAT_FILE_CREDIT_TIERS.map((tier, idx) => (
+                      <tr key={idx} className={activeLight ? "hover:bg-slate-50" : "hover:bg-white/[0.02]"}>
+                        <td className="p-3 font-bold text-purple-500">{tier.tierName}</td>
+                        <td className="p-3 text-slate-400">{tier.typicalType}</td>
+                        <td className="p-3 text-right">
+                          <span className={`px-2.5 py-1 rounded-full font-extrabold text-xs border ${tier.badgeColor}`}>
+                            {tier.credits} créditos
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className={`p-4 rounded-2xl border text-xs leading-relaxed space-y-1 ${activeLight ? "bg-purple-50/60 border-purple-200 text-purple-950" : "bg-purple-950/20 border-purple-500/20 text-purple-200"}`}>
+                <p className="font-semibold">💡 Optimización Inteligente de Tokens:</p>
+                <p className="text-[11px] opacity-90">
+                  Los créditos se descuentan de forma justa y transparente en función del tamaño del documento que la IA analiza. Para apuntes cortos y talleres (hasta 10 MB) el costo es de solo 2 créditos.
+                </p>
+              </div>
+            </div>
+
+            <div className={`p-4 border-t flex justify-end ${activeLight ? "border-slate-100 bg-slate-50" : "border-white/[0.08] bg-white/[0.02]"}`}>
+              <button
+                type="button"
+                onClick={() => setShowCreditTiersModal(false)}
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition cursor-pointer"
+              >
+                Entendido
               </button>
             </div>
           </div>
