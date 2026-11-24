@@ -1565,7 +1565,7 @@ export default function AiResourcesTab({
           {/* --------------------------------------------------------- */}
           {showFlashcardsView && resolvedFlashcardsData.length > 0 && (
             <div className="max-w-lg mx-auto space-y-6">
-              <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center text-xs text-slate-400">
                 <div className="flex items-center gap-2">
                   <span>
                     Tarjeta {currentCardIndex + 1} de {resolvedFlashcardsData.length}
@@ -1575,27 +1575,6 @@ export default function AiResourcesTab({
                     Dominadas: {masteredCards.size} / {resolvedFlashcardsData.length}
                   </span>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    exportFlashcardsToPDF({
-                      tema: activeResource.tema,
-                      materia: activeResource.materia,
-                      dificultad: activeResource.dificultad,
-                      flashcards: resolvedFlashcardsData,
-                    })
-                  }
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border shadow-xs ${
-                    activeLight
-                      ? "bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200"
-                      : "bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/40"
-                  }`}
-                  title="Descargar tarjetas de estudio en PDF listo para imprimir o recortar"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Descargar PDF</span>
-                </button>
               </div>
 
               {/* Tarjeta Flip 3D */}
