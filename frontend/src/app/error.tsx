@@ -91,7 +91,7 @@ export default function ErrorPage({ error, reset }: ErrorProps) {
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-            Dalat interceptó una turbulencia en la sesión. Tus notas, asignaturas y progreso académico están seguros. Pulsa el botón abajo para reiniciar el módulo.
+            Dalat interceptó una turbulencia en la sesión. Tus notas, materias y progreso académico están seguros. Pulsa el botón abajo para reiniciar el módulo.
           </p>
         </div>
 

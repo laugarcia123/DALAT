@@ -30,7 +30,7 @@ class GenerarRecursoRequest(BaseModel):
     materia: str = Field(..., description="Nombre de la asignatura, ej: Cálculo III")
     tema: str = Field(..., description="Tema específico, ej: Integrales Múltiples")
     dificultad: Optional[str] = "Intermedio"
-    cantidad: Optional[int] = Field(10, ge=3, le=25)
+    cantidad: Optional[int] = Field(10, ge=1, le=50)
     archivo_nombre: Optional[str] = None
     texto_adicional: Optional[str] = None
 

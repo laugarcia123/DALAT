@@ -1,6 +1,9 @@
 // Utility for generating and exporting high-resolution, beautifully styled A4 PDFs for Dalat AI resources
 // Supports: Exams, Flashcard Decks, and Academic Summaries
 
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
 export interface ExamQuestion {
   id?: number;
   pregunta: string;
@@ -15,6 +18,83 @@ export interface Flashcard {
   reverso: string;
   categoria?: string;
   dificultad?: string;
+}
+
+async function triggerDirectPdfDownload(htmlContent: string, documentTitle: string) {
+  // Creamos un iframe invisible para aislar los estilos de impresión CSS
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-9999px";
+  iframe.style.top = "0";
+  iframe.style.width = "794px"; // Ancho exacto A4 a 96 DPI
+  iframe.style.height = "auto";
+  iframe.style.minHeight = "1123px";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.setAttribute("aria-hidden", "true");
+  document.body.appendChild(iframe);
+
+  try {
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      throw new Error("No se pudo inicializar el renderizador de PDF");
+    }
+
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+
+    // Pequeña pausa para asegurar la carga completa de fuentes y layout
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const target = (doc.querySelector(".print-container") || doc.body) as HTMLElement;
+
+    const canvas = await html2canvas(target, {
+      scale: 2, // 2x para resolución nítida Retina / 192 DPI
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      windowWidth: 794,
+    });
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const pdfWidth = 210;
+    const pdfHeight = 297;
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+    heightLeft -= pdfHeight;
+
+    while (heightLeft > 0) {
+      position -= pdfHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+      heightLeft -= pdfHeight;
+    }
+
+    const cleanFilename = documentTitle.endsWith(".pdf") ? documentTitle : `${documentTitle}.pdf`;
+    pdf.save(cleanFilename);
+  } catch (err) {
+    console.error("[PDF Export Error] Falló descarga directa, usando fallback:", err);
+    triggerPrintIframe(htmlContent, documentTitle);
+  } finally {
+    setTimeout(() => {
+      try {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      } catch {}
+    }, 500);
+  }
 }
 
 function triggerPrintIframe(htmlContent: string, documentTitle: string) {
@@ -421,7 +501,7 @@ export function exportExamToPDF(params: {
 </body>
 </html>`;
 
-  triggerPrintIframe(html, cleanFilename);
+  triggerDirectPdfDownload(html, cleanFilename);
 }
 
 /**
@@ -627,5 +707,5 @@ export function exportFlashcardsToPDF(params: {
 </body>
 </html>`;
 
-  triggerPrintIframe(html, cleanFilename);
+  triggerDirectPdfDownload(html, cleanFilename);
 }

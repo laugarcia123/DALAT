@@ -162,6 +162,62 @@ def calcular_calculadora_rapida(
 # CRUD de Asignaturas
 # ====================================================
 
+def seed_default_subjects_for_user(db: Session, user_id: int) -> List[Asignatura]:
+    """Siembra las asignaturas y evaluaciones iniciales para el estudiante."""
+    subjects_data = [
+        {"nombre": "Cálculo III", "color": "#7c5dfa", "creditos": 4, "escala": 10.0, "aprob": 6.0},
+        {"nombre": "Economía", "color": "#10b981", "creditos": 3, "escala": 10.0, "aprob": 6.0},
+        {"nombre": "Química", "color": "#f43f5e", "creditos": 3, "escala": 10.0, "aprob": 6.0},
+        {"nombre": "Sistemas", "color": "#f59e0b", "creditos": 4, "escala": 10.0, "aprob": 6.0},
+        {"nombre": "Arquitectura", "color": "#06b6d4", "creditos": 3, "escala": 10.0, "aprob": 6.0},
+    ]
+    created = []
+    for s_info in subjects_data:
+        subj = Asignatura(
+            id_usuario=user_id,
+            nombre=s_info["nombre"],
+            creditos=s_info["creditos"],
+            color=s_info["color"],
+            escala_maxima=s_info["escala"],
+            nota_aprobatoria=s_info["aprob"],
+            periodo="2026-1",
+        )
+        db.add(subj)
+        db.flush()
+
+        if s_info["nombre"] == "Cálculo III":
+            eval1 = Evaluacion(
+                id_asignatura=subj.id_asignatura,
+                nombre="Tarea 1 — Límites",
+                tipo="Tarea",
+                corte=1,
+                nota=8.5,
+                max_nota=10.0,
+                peso_porcentaje=40.0,
+                fecha="28 feb",
+                completada=True,
+            )
+            eval2 = Evaluacion(
+                id_asignatura=subj.id_asignatura,
+                nombre="Parcial del corte",
+                tipo="Examen",
+                corte=1,
+                nota=7.5,
+                max_nota=10.0,
+                peso_porcentaje=60.0,
+                fecha="11 mar",
+                completada=True,
+            )
+            db.add_all([eval1, eval2])
+
+        created.append(subj)
+
+    db.commit()
+    for s in created:
+        db.refresh(s)
+    return created
+
+
 def get_user_subjects(db: Session, user_id: int) -> List[Asignatura]:
     """Obtiene todas las asignaturas de un usuario."""
     return (
@@ -252,13 +308,16 @@ def get_evaluation_by_id(db: Session, eval_id: int) -> Optional[Evaluacion]:
 
 def create_evaluation(db: Session, subject_id: int, eval_in: EvaluacionCreate) -> Evaluacion:
     """Agrega una nueva evaluación a una asignatura."""
+    subject = db.query(Asignatura).filter(Asignatura.id_asignatura == subject_id).first()
+    default_max = subject.escala_maxima if subject else 5.0
+
     db_eval = Evaluacion(
         id_asignatura=subject_id,
         nombre=eval_in.nombre.strip(),
         tipo=eval_in.tipo or "Parcial",
         corte=eval_in.corte or 1,
         nota=eval_in.nota,
-        max_nota=eval_in.max_nota or 5.0,
+        max_nota=eval_in.max_nota or default_max,
         peso_porcentaje=eval_in.peso_porcentaje,
         fecha=eval_in.fecha,
         completada=eval_in.completada or (eval_in.nota is not None),

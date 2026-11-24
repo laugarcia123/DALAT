@@ -60,6 +60,21 @@ def calculate_streak_and_hours(
         .all()
     )
 
+    if not sesiones:
+        return SesionStats(
+            total_horas_historicas=0.0,
+            horas_esta_semana=0.0,
+            horas_semana_pasada=0.0,
+            diferencia_horas_semana=0.0,
+            racha_dias_actual=0,
+            record_racha_dias=0,
+            meta_semanal_horas=meta_semanal_horas,
+            porcentaje_meta_semanal=0.0,
+            horas_faltantes_meta=meta_semanal_horas,
+            sesiones_hoy_count=0,
+            minutos_hoy=0,
+        )
+
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
 
@@ -140,8 +155,12 @@ def calculate_streak_and_hours(
 
 
 def seed_default_sessions_for_user(db: Session, user_id: int) -> List[SesionEstudio]:
-    """Siembra 14 días consecutivos de sesiones para inicializar las métricas de estudio."""
+    """Siembra 14 días consecutivos de sesiones para inicializar las métricas de estudio de Daniel (14 días de racha, 31h esta semana)."""
     now = datetime.now()
+    today = now.date()
+    start_of_this_week = today - timedelta(days=today.weekday())
+    start_of_last_week = start_of_this_week - timedelta(days=7)
+
     materias_pool = [
         "Cálculo Multivariable",
         "Arquitectura de Software",
@@ -151,28 +170,44 @@ def seed_default_sessions_for_user(db: Session, user_id: int) -> List[SesionEstu
     ]
 
     sesiones_a_crear = []
+    # Días transcurridos en esta semana incluyendo hoy
+    dias_esta_semana = max(1, (today - start_of_this_week).days + 1)
+    # 31 horas repartidas en los días de esta semana
+    segundos_por_dia_esta_semana = int((31.0 * 3600) / dias_esta_semana)
+
     # Últimos 14 días (del día 13 atrás hasta hoy día 0)
     for day_offset in range(13, -1, -1):
-        target_date = now - timedelta(days=day_offset)
-        # 2 a 4 sesiones por día
-        num_sesiones = 3 if day_offset % 2 == 0 else 2
+        target_date = today - timedelta(days=day_offset)
+        
+        # Determinar duración según si es esta semana, la semana pasada, o días previos
+        if target_date >= start_of_this_week:
+            # Esta semana: sesiones que sumen para totalizar 31h
+            num_sesiones = 4
+            duracion_por_sesion = segundos_por_dia_esta_semana // num_sesiones
+        elif target_date >= start_of_last_week:
+            # Semana pasada (~28h total en 7 días = 4h/día)
+            num_sesiones = 3
+            duracion_por_sesion = int((28.0 * 3600 / 7) / num_sesiones)
+        else:
+            # Días anteriores (para asegurar los 14 días continuos de racha)
+            num_sesiones = 2
+            duracion_por_sesion = 3600  # 1h por sesión
+
         for s_idx in range(num_sesiones):
             hora_offset = 8 + (s_idx * 3)
             session_time = datetime(
                 target_date.year,
                 target_date.month,
                 target_date.day,
-                hora_offset,
+                min(22, hora_offset),
                 15,
                 0,
             )
-            # Duraciones típicas de Pomodoro: 25 min (1500s), 45 min (2700s), 50 min (3000s)
-            duracion = 2700 if (day_offset + s_idx) % 2 == 0 else 1500
             materia = materias_pool[(day_offset + s_idx) % len(materias_pool)]
 
             sesion = SesionEstudio(
                 id_usuario=user_id,
-                duracion_segundos=duracion,
+                duracion_segundos=duracion_por_sesion,
                 materia=materia,
                 completada=True,
                 tipo="zen",

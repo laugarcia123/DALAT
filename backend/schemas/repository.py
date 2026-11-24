@@ -47,6 +47,9 @@ class EquipoResponse(EquipoBase):
     documentos_count: Optional[int] = 0
     fecha_creacion: Optional[datetime] = None
     documentos: Optional[List[DocumentoResponse]] = []
+    es_miembro: Optional[bool] = False
+    es_creador: Optional[bool] = False
+    rol_usuario: Optional[str] = None
 
     class Config:
         from_attributes = True

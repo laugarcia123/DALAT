@@ -4,6 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import { repositoryService, DocumentoItem, EquipoItem } from "@/services/repositoryService";
 import { studySessionService } from "@/services/studySessionService";
+import { aiService } from "@/services/aiService";
+import { authService } from "@/services/authService";
+import { useAuth } from "@/context/AuthContext";
 import {
   X,
   Play,
@@ -46,7 +49,7 @@ interface PsicopataModalProps {
   isPro?: boolean;
   onGoToCheckout?: () => void;
   tokensBalance?: number;
-  onDeductTokens?: (amount: number) => void;
+  onDeductTokens?: (amount: number) => Promise<number> | void;
   onSessionCompleted?: () => void;
 }
 
@@ -62,29 +65,7 @@ export interface MaterialFile {
   previewText?: string;
 }
 
-const DEFAULT_MATERIALS: MaterialFile[] = [
-  {
-    id: "f1",
-    name: "Unidad 3 — Integrales múltiples.pdf",
-    subject: "Cálculo III",
-    size: "2.7 MB",
-    type: "pdf",
-  },
-  {
-    id: "f2",
-    name: "Notas de clase — Microeconomía.docx",
-    subject: "Economía",
-    size: "898 KB",
-    type: "docx",
-  },
-  {
-    id: "f3",
-    name: "Guía 2 — Leyes de Newton y Energía.pdf",
-    subject: "Física Mecánica",
-    size: "1.4 MB",
-    type: "pdf",
-  },
-];
+const DEFAULT_MATERIALS: MaterialFile[] = [];
 
 interface FlashcardQuestion {
   id: number;
@@ -532,9 +513,103 @@ function generatePsicopataQuestions(
     },
   ];
 
+  // Banco de Fundamentos Universitarios y Pensamiento Crítico (Humanidades, Metodología, Ciencias Sociales y Salud)
+  const universityTheoryBank: Omit<FlashcardQuestion, "id">[] = [
+    {
+      pregunta: "¿Cuál es la distinción epistemológica central entre el falsacionismo popperiano y el inductivismo clásico?",
+      opciones: [
+        "Una teoría científica nunca puede verificarse de forma definitiva, únicamente refutarse mediante contrastación empírica",
+        "El conocimiento avanza acumulando observaciones particulares sin necesidad de hipótesis previas",
+        "Toda proposición científica debe ser demostrable mediante inducción probabilística infalible",
+        "La ciencia se fundamenta exclusivamente en juicios sintéticos a priori indemostrables",
+      ],
+      indice_correcto: 0,
+      explicacion: "Karl Popper demostró que ninguna cantidad de casos favorables verifica una ley universal, pero una sola refutación la invalida.",
+    },
+    {
+      pregunta: "En metodología de investigación, ¿qué define la validez interna de un diseño experimental?",
+      opciones: [
+        "El grado de certeza con que la variación observada en la variable dependiente es atribuible únicamente a la independiente",
+        "La capacidad de extrapolar los hallazgos a toda la población diana sin sesgo muestral",
+        "La concordancia temporal entre dos mediciones sucesivas aplicadas al mismo sujeto",
+        "La consistencia interna de los ítems evaluada mediante el coeficiente Alfa de Cronbach",
+      ],
+      indice_correcto: 0,
+      explicacion: "La validez interna garantiza el control riguroso de variables extrañas y confirma causalidad directa en el estudio.",
+    },
+    {
+      pregunta: "¿Qué caracteriza al concepto de 'paradigma científico' formulado por Thomas Kuhn?",
+      opciones: [
+        "Un marco conceptual, metodológico y de valores compartido por una comunidad científica que guía la ciencia normal",
+        "Una hipótesis cuantitativa que ha resistido más de un siglo de pruebas de laboratorio",
+        "El método experimental inductivo empleado exclusivamente en las ciencias duras",
+        "La suma lineal y continua de todos los descubrimientos acumulados a lo largo de la historia",
+      ],
+      indice_correcto: 0,
+      explicacion: "Kuhn define el paradigma como el consenso de supuestos teóricos y métodos que rige hasta la aparición de anomalías y crisis.",
+    },
+    {
+      pregunta: "En ética normativa, ¿cuál es el postulado definitorio del deontologismo kantiano?",
+      opciones: [
+        "La moralidad de una acción radica en el cumplimiento del deber por respeto al imperativo categórico, no en sus consecuencias",
+        "Una acción es correcta si y solo si maximiza la felicidad neta para el mayor número de personas afectadas",
+        "El bien moral está determinado por el florecimiento de virtudes y el hábito del término medio aristotélico",
+        "Los juicios morales son meras proyecciones emotivas carentes de verdad o validez universal",
+      ],
+      indice_correcto: 0,
+      explicacion: "Para Kant, el valor moral de un acto emana de la buena voluntad y el deber categórico, independientemente de los resultados.",
+    },
+    {
+      pregunta: "¿Qué establece el principio de contradicción como axioma lógico fundamental?",
+      opciones: [
+        "Es imposible que una proposición sea verdadera y falsa al mismo tiempo y en el mismo sentido: ¬(P ∧ ¬P)",
+        "Toda afirmación requiere una causa suficiente demostrada empíricamente",
+        "Si dos premisas son contingentes, la conclusión necesariamente debe ser verdadera",
+        "Cualquier juicio sintético es deducible a partir de sus propiedades semánticas intrínsecas",
+      ],
+      indice_correcto: 0,
+      explicacion: "El principio aristotélico de no contradicción sostiene que una entidad no puede poseer y no poseer un atributo simultáneamente.",
+    },
+    {
+      pregunta: "En el análisis de políticas públicas e instituciones, ¿qué define el concepto de 'Path Dependence' (dependencia del camino)?",
+      opciones: [
+        "Las decisiones y estructuras institucionales del pasado constriñen y determinan las trayectorias y alternativas viables presentes",
+        "La obligación constitucional de someter cada ley a consulta popular obligatoria",
+        "El principio administrativo según el cual los presupuestos deben incrementarse a tasa constante",
+        "La teoría que postula que las instituciones convergen automáticamente hacia el óptimo económico de Pareto",
+      ],
+      indice_correcto: 0,
+      explicacion: "La dependencia del camino demuestra cómo los costos de transición refuerzan patrones institucionales históricos previos.",
+    },
+    {
+      pregunta: "¿En qué consiste el sesgo cognitivo de confirmación en el razonamiento crítico?",
+      opciones: [
+        "La tendencia sistemática a buscar, interpretar y recordar información que respalda las hipótesis previas propias",
+        "La sobreestimación de la probabilidad de eventos basada en la facilidad para recordar ejemplos vívidos",
+        "La creencia infundada de que los resultados pasados aleatorios influyen en eventos futuros independientes",
+        "La atribución de éxitos a causas internas y fracasos a factores externos circunstanciales",
+      ],
+      indice_correcto: 0,
+      explicacion: "El sesgo de confirmación distorsiona la evaluación objetiva al filtrar evidencias contrarias a las creencias del analista.",
+    },
+    {
+      pregunta: "¿Qué diferencia medular existe entre un enfoque de investigación cualitativo y uno cuantitativo?",
+      opciones: [
+        "El cualitativo busca comprender significados, contextos y fenómenos en profundidad; el cuantitativo mide variables y prueba hipótesis estadísticas",
+        "El cualitativo siempre carece de rigor científico, mientras que el cuantitativo es infalible",
+        "El cualitativo se restringe únicamente al análisis lingüístico de obras literarias antiguas",
+        "El cuantitativo no utiliza datos empíricos ni recolección de muestras observacionales",
+      ],
+      indice_correcto: 0,
+      explicacion: "La distinción reside en el propósito ontológico y metodológico: comprensión hermenéutica contextual vs. contrastación probabilística.",
+    },
+  ];
+
   // Seleccionar banco base según materia
-  let selectedBase = calculusBank;
-  if (subj.includes("econ") || name.includes("econ") || subj.includes("finan")) {
+  let selectedBase = universityTheoryBank;
+  if (subj.includes("cálcul") || subj.includes("calcul") || subj.includes("matem") || name.includes("calcul") || name.includes("integral")) {
+    selectedBase = calculusBank;
+  } else if (subj.includes("econ") || name.includes("econ") || subj.includes("finan")) {
     selectedBase = economicsBank;
   } else if (subj.includes("fís") || subj.includes("fis") || name.includes("newton") || subj.includes("mecán")) {
     selectedBase = physicsBank;
@@ -542,8 +617,8 @@ function generatePsicopataQuestions(
     selectedBase = csBank;
   }
 
-  // Mezclar con los otros bancos para asegurar preguntas suficientes hasta 50
-  const combined = [...selectedBase, ...calculusBank, ...economicsBank, ...physicsBank, ...csBank];
+  // Mezclar asegurando preguntas variadas
+  const combined = [...selectedBase, ...universityTheoryBank, ...economicsBank, ...csBank];
 
   // Generar exactamente la cantidad solicitada (20, 35 o 50) con preguntas variadas
   const result: FlashcardQuestion[] = [];
@@ -581,9 +656,12 @@ export default function PsicopataModal({
   onDeductTokens,
   onSessionCompleted,
 }: PsicopataModalProps) {
+  const { user } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showExplanation, setShowExplanation] = useState<boolean>(false);
   const [resourceSearch, setResourceSearch] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
 
   // Control de paywall para usuarios gratuitos y feedback de validación
   const [showFreePaywall, setShowFreePaywall] = useState<boolean>(false);
@@ -595,27 +673,17 @@ export default function PsicopataModal({
   const [repoFilterTab, setRepoFilterTab] = useState<"equipos" | "personal">("equipos");
 
   // Materiales cargados desde Recursos IA y Repositorio
-  const [materials, setMaterials] = useState<MaterialFile[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("dalat_ai_materials");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch {}
-    }
-    return DEFAULT_MATERIALS;
-  });
-
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>(() => materials[0]?.id || "f1");
-  const selectedMaterial = materials.find((m) => m.id === selectedMaterialId) || materials[0] || DEFAULT_MATERIALS[0];
+  const [materials, setMaterials] = useState<MaterialFile[]>([]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>("");
+  const selectedMaterial = materials.find((m) => m.id === selectedMaterialId) || materials[0] || null;
 
   // Mostrar únicamente los 3 documentos más recientes en la vista rápida
   const recentMaterials = materials.slice(0, 3);
   const displayedQuickMaterials = recentMaterials.some((m) => m.id === selectedMaterialId)
     ? recentMaterials
-    : [selectedMaterial, ...recentMaterials.slice(0, 2)];
+    : selectedMaterial
+    ? [selectedMaterial, ...recentMaterials.slice(0, 2)]
+    : [];
 
   // Filtrado de materiales para el modal explorador completo
   const filteredMaterials = materials.filter((m) => {
@@ -644,40 +712,63 @@ export default function PsicopataModal({
     index: number;
   } | null>(null);
 
-  // Estadísticas persistentes del Método Psicópata
-  const [bestStreakRecord, setBestStreakRecord] = useState<number>(0);
-  const [psicopataVictories, setPsicopataVictories] = useState<number>(0);
+  // Estadísticas persistentes del Método Psicópata (sincronizadas con PostgreSQL)
+  const [bestStreakRecord, setBestStreakRecord] = useState<number>(user?.recordPsicopata ?? 0);
+  const [psicopataVictories, setPsicopataVictories] = useState<number>(user?.victoriasPsicopata ?? 0);
 
-  // Cargar records y repositorios reales desde el backend
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const rec = parseInt(localStorage.getItem("dalat_psicopata_best_streak") || "0", 10);
-      const vic = parseInt(localStorage.getItem("dalat_psicopata_victories") || "0", 10);
-      setBestStreakRecord(rec);
-      setPsicopataVictories(vic);
+    if (user?.recordPsicopata !== undefined) {
+      setBestStreakRecord(user.recordPsicopata);
+    } else {
+      setBestStreakRecord(0);
+    }
+    if (user?.victoriasPsicopata !== undefined) {
+      setPsicopataVictories(user.victoriasPsicopata);
+    } else {
+      setPsicopataVictories(0);
+    }
+  }, [user?.recordPsicopata, user?.victoriasPsicopata, isOpen]);
 
-      // Cargar repositorios reales desde PostgreSQL
-      if (isOpen) {
-        repositoryService
-          .getEquipos()
-          .then((data) => {
-            if (Array.isArray(data)) {
-              setEquipos(data);
-              // Aplanar documentos de todos los repositorios para la selección rápida de recientes
-              const allDocs: MaterialFile[] = [];
-              data.forEach((eq) => {
-                (eq.documentos || []).forEach((d) => {
-                  const fmt = (d.formato || "").toUpperCase();
-                  const docNameLower = d.nombre.toLowerCase();
-                  const isLink =
-                    fmt === "LINK" ||
-                    fmt === "NOTION" ||
-                    d.tamano === "Enlace" ||
-                    Boolean(d.url_recurso?.startsWith("http")) ||
-                    docNameLower.startsWith("http");
+  // Cargar repositorios reales desde el backend
+  useEffect(() => {
+    if (isOpen) {
+      repositoryService
+        .getEquipos()
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setEquipos(data);
+            // Aplanar documentos de todos los repositorios para la selección rápida de recientes
+            const allDocs: MaterialFile[] = [];
+            data.forEach((eq) => {
+              (eq.documentos || []).forEach((d) => {
+                const fmt = (d.formato || "").toUpperCase();
+                const docNameLower = d.nombre.toLowerCase();
+                const isDocx =
+                  fmt.includes("DOC") ||
+                  fmt.includes("WORD") ||
+                  docNameLower.endsWith(".docx") ||
+                  docNameLower.endsWith(".doc");
 
-                  const isArchive =
-                    fmt === "ZIP" ||
+                const isPpt =
+                  fmt.includes("PPT") ||
+                  docNameLower.endsWith(".pptx") ||
+                  docNameLower.endsWith(".ppt");
+
+                const isTxt =
+                  fmt.includes("TXT") ||
+                  fmt.includes("MD") ||
+                  docNameLower.endsWith(".txt") ||
+                  docNameLower.endsWith(".md");
+
+                const isPdf =
+                  fmt.includes("PDF") ||
+                  docNameLower.endsWith(".pdf");
+
+                const isRealDoc = isDocx || isPpt || isTxt || isPdf;
+
+                const isArchive =
+                  !isRealDoc &&
+                  (fmt === "ZIP" ||
                     fmt === "RAR" ||
                     fmt === "7Z" ||
                     fmt === "TAR" ||
@@ -689,66 +780,59 @@ export default function PsicopataModal({
                     docNameLower.endsWith(".7z") ||
                     docNameLower.endsWith(".tar") ||
                     docNameLower.endsWith(".gz") ||
-                    docNameLower.endsWith(".tgz");
+                    docNameLower.endsWith(".tgz"));
 
-                  const isDocx =
-                    fmt.includes("DOC") ||
-                    fmt.includes("WORD") ||
-                    docNameLower.endsWith(".docx") ||
-                    docNameLower.endsWith(".doc");
+                const isLink =
+                  !isRealDoc &&
+                  !isArchive &&
+                  (fmt === "LINK" ||
+                    fmt === "NOTION" ||
+                    d.tamano === "Enlace" ||
+                    docNameLower.startsWith("http://") ||
+                    docNameLower.startsWith("https://"));
 
-                  const isPpt =
-                    fmt.includes("PPT") ||
-                    docNameLower.endsWith(".pptx") ||
-                    docNameLower.endsWith(".ppt");
-
-                  const isTxt =
-                    fmt.includes("TXT") ||
-                    fmt.includes("MD") ||
-                    docNameLower.endsWith(".txt") ||
-                    docNameLower.endsWith(".md");
-
-                  allDocs.push({
-                    id: `doc_${d.id_documento}`,
-                    name: d.nombre,
-                    subject: eq.nombre,
-                    size: d.tamano || "1.0 MB",
-                    type: isLink
-                      ? "link"
-                      : isArchive
-                      ? "zip"
-                      : isDocx
-                      ? "docx"
-                      : isTxt
-                      ? "txt"
-                      : isPpt
-                      ? "ppt"
-                      : "pdf",
-                    isLink,
-                    isArchive,
-                    previewText: d.descripcion || d.nombre,
-                  });
+                allDocs.push({
+                  id: `doc_${d.id_documento}`,
+                  name: d.nombre,
+                  subject: eq.nombre,
+                  size: d.tamano || "1.0 MB",
+                  type: isLink
+                    ? "link"
+                    : isArchive
+                    ? "zip"
+                    : isDocx
+                    ? "docx"
+                    : isTxt
+                    ? "txt"
+                    : isPpt
+                    ? "ppt"
+                    : "pdf",
+                  isLink,
+                  isArchive,
+                  previewText: d.descripcion || d.nombre,
                 });
               });
-              // Para la selección rápida inicial, excluir enlaces y archivos comprimidos
-              const playableDocs = allDocs.filter((d) => !d.isLink && !d.isArchive);
-              if (playableDocs.length > 0) {
-                setMaterials(playableDocs);
-                setSelectedMaterialId((prev) =>
-                  prev && playableDocs.some((m) => m.id === prev) ? prev : playableDocs[0].id
-                );
-              }
+            });
+            // Para la selección rápida inicial, excluir enlaces y archivos comprimidos
+            const playableDocs = allDocs.filter((d) => !d.isLink && !d.isArchive);
+            setMaterials(playableDocs);
+            if (playableDocs.length > 0) {
+              setSelectedMaterialId((prev) =>
+                prev && playableDocs.some((m) => m.id === prev) ? prev : playableDocs[0].id
+              );
+            } else {
+              setSelectedMaterialId("");
             }
-          })
-          .catch((err) =>
-            console.warn("Error cargando repositorios en PsicopataModal:", err)
-          );
-      }
+          }
+        })
+        .catch((err) =>
+          console.warn("Error cargando repositorios en PsicopataModal:", err)
+        );
     }
   }, [isOpen]);
 
-  // Iniciar el Desafío Muerte Súbita con validación PRO y deducción de tokens (sin sonidos)
-  const handleStartFlashcardChallenge = () => {
+  // Iniciar el Desafío Muerte Súbita con IA real, validación PRO y deducción real en base de datos
+  const handleStartFlashcardChallenge = async () => {
     setErrorMessage("");
 
     // 1. Si no es PRO, bloquear con paywall modal de inmediato
@@ -764,20 +848,68 @@ export default function PsicopataModal({
       return;
     }
 
-    // 3. Descontar tokens del balance global
-    onDeductTokens?.(tokenCost);
+    setIsGenerating(true);
 
-    const generated = generatePsicopataQuestions(selectedMaterial, cardCountGoal);
-    setQuestions(generated);
-    setCurrentIndex(0);
-    setStreak(0);
-    setSelectedOptionIndex(null);
-    setIsAnswerChecking(false);
-    setFailedQuestion(null);
-    setGameStage("playing");
+    try {
+      // 3. Descontar tokens del balance global en la base de datos PostgreSQL
+      if (onDeductTokens) {
+        await onDeductTokens(tokenCost);
+      } else {
+        await authService.deductTokens(tokenCost);
+      }
+
+      // 4. Invocar IA real universitaria a partir del archivo seleccionado
+      const promptTema = selectedMaterial?.name || "Conceptos Teóricos Universitarios";
+      const promptMateria = selectedMaterial?.subject || "Universidad";
+      const promptContexto = selectedMaterial?.previewText || `Documento de estudio: ${selectedMaterial?.name}`;
+
+      const aiResponse = await aiService.generarRecurso({
+        tipo_recurso: "Psicopata",
+        materia: promptMateria,
+        tema: promptTema,
+        dificultad: "Avanzado",
+        cantidad: cardCountGoal,
+        archivo_nombre: selectedMaterial?.name,
+        texto_adicional: promptContexto,
+      });
+
+      let loadedQuestions: FlashcardQuestion[] = [];
+
+      if (aiResponse && aiResponse.contenido && Array.isArray(aiResponse.contenido) && aiResponse.contenido.length > 0) {
+        loadedQuestions = aiResponse.contenido.map((q: any, idx: number) => ({
+          id: q.id || idx + 1,
+          pregunta: q.pregunta || `Pregunta ${idx + 1}`,
+          opciones: Array.isArray(q.opciones) ? q.opciones : ["Opción A", "Opción B", "Opción C", "Opción D"],
+          indice_correcto: typeof q.indice_correcto === "number" ? q.indice_correcto : 0,
+          explicacion: q.explicacion || "Justificación teórica y análisis pedagógico profundo.",
+          tema: promptMateria,
+        }));
+      }
+
+      // Complementar si faltan para alcanzar la meta exacta
+      if (loadedQuestions.length < cardCountGoal) {
+        const fallback = generatePsicopataQuestions(selectedMaterial, cardCountGoal);
+        const needed = cardCountGoal - loadedQuestions.length;
+        loadedQuestions = [...loadedQuestions, ...fallback.slice(0, needed)];
+      }
+
+      setQuestions(loadedQuestions);
+      setCurrentIndex(0);
+      setStreak(0);
+      setSelectedOptionIndex(null);
+      setIsAnswerChecking(false);
+      setFailedQuestion(null);
+      setSessionStartTime(Date.now());
+      setGameStage("playing");
+    } catch (err: any) {
+      console.error("Error al iniciar Desafío Psicópata con IA:", err);
+      setErrorMessage(err?.message || "Error al conectar con la IA de Dalat. Inténtalo nuevamente.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  // Manejar respuesta del usuario a una flashcard (sin sonidos)
+  // Manejar respuesta del usuario a una flashcard (sin sonidos ni música)
   const handleSelectAnswer = (optionIndex: number) => {
     if (isAnswerChecking || gameStage !== "playing") return;
 
@@ -798,13 +930,18 @@ export default function PsicopataModal({
         try {
           localStorage.setItem("dalat_psicopata_best_streak", nextStreak.toString());
         } catch {}
+        // Persistir récord en PostgreSQL
+        authService.updatePsicopataRecord(nextStreak, false).catch((err) => {
+          console.warn("Error persistiendo récord psicópata en backend:", err);
+        });
       }
 
       // Verificar si completó todas sin error
       if (currentIndex + 1 >= cardCountGoal) {
-        // Registrar sesión de estudio completada para sumar a la racha diaria
+        const elapsedSecs = Math.max(60, Math.floor((Date.now() - sessionStartTime) / 1000));
+        // Registrar sesión de estudio completada para encender la racha diaria en PostgreSQL
         studySessionService.logSession({
-          duracion_segundos: 15 * 60,
+          duracion_segundos: elapsedSecs,
           materia: selectedMaterial?.subject || "Método Psicópata",
           completada: true,
           tipo: "psicopata",
@@ -813,6 +950,11 @@ export default function PsicopataModal({
           onSessionCompleted?.();
         }).catch((err) => {
           console.error("Error al registrar sesión de Método Psicópata:", err);
+        });
+
+        // Persistir victoria en base de datos PostgreSQL
+        authService.updatePsicopataRecord(nextStreak, true).catch((err) => {
+          console.warn("Error persistiendo victoria psicópata en backend:", err);
         });
 
         setTimeout(() => {
@@ -846,6 +988,20 @@ export default function PsicopataModal({
         index: currentIndex,
       });
 
+      // Guardar sesión de estudio real en PostgreSQL para encender y mantener la racha
+      const elapsedSecs = Math.max(30, Math.floor((Date.now() - sessionStartTime) / 1000));
+      studySessionService.logSession({
+        duracion_segundos: elapsedSecs,
+        materia: selectedMaterial?.subject || "Método Psicópata",
+        completada: false,
+        tipo: "psicopata",
+        notas: `Intento Desafío Psicópata: racha de ${streak} aciertos antes de error`,
+      }).then(() => {
+        onSessionCompleted?.();
+      }).catch((err) => {
+        console.warn("Error registrando sesión de intento psicópata:", err);
+      });
+
       setTimeout(() => {
         setGameStage("fatal_error");
         setIsAnswerChecking(false);
@@ -853,16 +1009,17 @@ export default function PsicopataModal({
     }
   };
 
-  // Reiniciar el desafío tras el error fatal (regla psicópata: vuelve a la tarjeta 1, sin sonidos)
+  // Reiniciar el desafío tras el error fatal (regla psicópata: vuelve a la tarjeta 1, sin sonidos ni música)
   const handleRestartAfterFatalError = () => {
-    // Regenerar y rebarajar para que no sea memorización ciega
-    const reshuffled = generatePsicopataQuestions(selectedMaterial, cardCountGoal);
+    // Rebarajar las preguntas existentes generadas para un nuevo intento limpio
+    const reshuffled = [...questions].sort(() => Math.random() - 0.5);
     setQuestions(reshuffled);
     setCurrentIndex(0);
     setStreak(0);
     setSelectedOptionIndex(null);
     setIsAnswerChecking(false);
     setFailedQuestion(null);
+    setSessionStartTime(Date.now());
     setGameStage("playing");
   };
 
@@ -981,62 +1138,84 @@ export default function PsicopataModal({
                   </div>
                 </div>
 
-                {/* Contenedor con las 3 tarjetas de documentos recientes */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {displayedQuickMaterials.map((mat) => {
-                    const isSelected = selectedMaterialId === mat.id;
-                    return (
-                      <div
-                        key={mat.id}
-                        onClick={() => setSelectedMaterialId(mat.id)}
-                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative select-none flex items-center justify-between gap-3 ${
-                          isSelected
-                            ? isLightMode
-                              ? "bg-red-50/80 border-red-500 ring-2 ring-red-400/30 shadow-sm"
-                              : "bg-red-950/40 border-red-500 ring-2 ring-red-500/30 shadow-sm"
-                            : isLightMode
-                            ? "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 hover:border-slate-300 shadow-sm"
-                            : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-300 hover:border-white/[0.15]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <span
-                            className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 ${
-                              mat.type === "pdf"
-                                ? "bg-rose-500/15 text-rose-600 border border-rose-500/25"
-                                : mat.type === "docx"
-                                ? "bg-blue-500/15 text-blue-600 border border-blue-500/25"
-                                : mat.type === "ppt"
-                                ? "bg-amber-500/15 text-amber-600 border border-amber-500/25"
-                                : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25"
-                            }`}
-                          >
-                            {mat.type.toUpperCase()}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-xs font-bold truncate leading-snug" title={mat.name}>
-                              {mat.name}
-                            </h4>
-                            <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                              {mat.subject} • {mat.size}
-                            </p>
+                {/* Contenedor con documentos recientes o estado vacío */}
+                {displayedQuickMaterials.length === 0 ? (
+                  <div
+                    className={`p-6 sm:p-7 rounded-2xl border text-center space-y-2.5 ${
+                      isLightMode
+                        ? "bg-slate-50 border-slate-200 text-slate-600 shadow-xs"
+                        : "bg-white/[0.02] border-white/[0.08] text-slate-400"
+                    }`}
+                  >
+                    <div className="w-10 h-10 rounded-xl mx-auto flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/20">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className={`text-xs sm:text-sm font-bold ${isLightMode ? "text-slate-800" : "text-white"}`}>
+                        No tienes documentos en tus repositorios
+                      </h4>
+                      <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">
+                        Sube tus apuntes, resúmenes o lecturas en la pestaña <strong>Repositorio</strong> para que el Método Psicópata genere tu desafío de estudio.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {displayedQuickMaterials.map((mat) => {
+                      const isSelected = selectedMaterialId === mat.id;
+                      return (
+                        <div
+                          key={mat.id}
+                          onClick={() => setSelectedMaterialId(mat.id)}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative select-none flex items-center justify-between gap-3 ${
+                            isSelected
+                              ? isLightMode
+                                ? "bg-red-50/80 border-red-500 ring-2 ring-red-400/30 shadow-sm"
+                                : "bg-red-950/40 border-red-500 ring-2 ring-red-500/30 shadow-sm"
+                              : isLightMode
+                              ? "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 hover:border-slate-300 shadow-sm"
+                              : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-300 hover:border-white/[0.15]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <span
+                              className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 ${
+                                mat.type === "pdf"
+                                  ? "bg-rose-500/15 text-rose-600 border border-rose-500/25"
+                                  : mat.type === "docx"
+                                  ? "bg-blue-500/15 text-blue-600 border border-blue-500/25"
+                                  : mat.type === "ppt"
+                                  ? "bg-amber-500/15 text-amber-600 border border-amber-500/25"
+                                  : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25"
+                              }`}
+                            >
+                              {mat.type.toUpperCase()}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-xs font-bold truncate leading-snug" title={mat.name}>
+                                {mat.name}
+                              </h4>
+                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                {mat.subject} • {mat.size}
+                              </p>
+                            </div>
                           </div>
+                          {isSelected ? (
+                            <div className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                          ) : (
+                            <div
+                              className={`w-4 h-4 rounded-full border shrink-0 ${
+                                isLightMode ? "border-slate-300" : "border-slate-700"
+                              }`}
+                            />
+                          )}
                         </div>
-                        {isSelected ? (
-                          <div className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                            <Check className="w-3 h-3 stroke-[3]" />
-                          </div>
-                        ) : (
-                          <div
-                            className={`w-4 h-4 rounded-full border shrink-0 ${
-                              isLightMode ? "border-slate-300" : "border-slate-700"
-                            }`}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Detalle del archivo seleccionado y botón para abrir todos */}
                 <div className="flex items-center justify-between text-xs px-1 text-slate-400 pt-1">
@@ -1092,11 +1271,6 @@ export default function PsicopataModal({
                       Aciertos consecutivos sin error requeridos para superar el reto
                     </p>
                   </div>
-                  {isPro && (
-                    <span className="text-[11px] font-semibold text-purple-400">
-                      Tokens disponibles: <strong className="font-bold text-white">{tokensBalance}</strong>
-                    </span>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 sm:gap-4 max-w-md">
@@ -1202,12 +1376,27 @@ export default function PsicopataModal({
 
                   <button
                     type="button"
+                    disabled={isGenerating || materials.length === 0 || !selectedMaterial}
                     onClick={handleStartFlashcardChallenge}
-                    className="w-full sm:w-auto px-7 py-3 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-600 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-md shadow-red-600/30 cursor-pointer active:scale-95 transition-all"
+                    className="w-full sm:w-auto px-7 py-3 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-600 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-md shadow-red-600/30 cursor-pointer active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Zap className="w-4 h-4 fill-current" />
-                    <span>Iniciar Desafío ({cardCountGoal} Flashcards)</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {isGenerating ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                        <span>Generando desafío con IA real...</span>
+                      </>
+                    ) : materials.length === 0 ? (
+                      <>
+                        <FileText className="w-4 h-4" />
+                        <span>Sube un documento para iniciar</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 fill-current" />
+                        <span>Iniciar Desafío ({cardCountGoal} Flashcards)</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -2025,27 +2214,53 @@ export default function PsicopataModal({
                         {filteredDocs.map((doc) => {
                           const fmt = (doc.formato || "").toUpperCase();
                           const docNameLower = doc.nombre.toLowerCase();
-                          const isLink =
-                            fmt === "LINK" ||
-                            fmt === "NOTION" ||
-                            doc.tamano === "Enlace" ||
-                            Boolean(doc.url_recurso?.startsWith("http")) ||
-                            docNameLower.startsWith("http");
+                          const isDocx =
+                            fmt.includes("DOC") ||
+                            fmt.includes("WORD") ||
+                            docNameLower.endsWith(".docx") ||
+                            docNameLower.endsWith(".doc");
+
+                          const isPpt =
+                            fmt.includes("PPT") ||
+                            docNameLower.endsWith(".pptx") ||
+                            docNameLower.endsWith(".ppt");
+
+                          const isTxt =
+                            fmt.includes("TXT") ||
+                            fmt.includes("MD") ||
+                            docNameLower.endsWith(".txt") ||
+                            docNameLower.endsWith(".md");
+
+                          const isPdf =
+                            fmt.includes("PDF") ||
+                            docNameLower.endsWith(".pdf");
+
+                          const isRealDoc = isDocx || isPpt || isTxt || isPdf;
 
                           const isArchive =
-                            fmt === "ZIP" ||
-                            fmt === "RAR" ||
-                            fmt === "7Z" ||
-                            fmt === "TAR" ||
-                            fmt === "GZ" ||
-                            fmt.includes("ZIP") ||
-                            fmt.includes("RAR") ||
-                            docNameLower.endsWith(".zip") ||
-                            docNameLower.endsWith(".rar") ||
-                            docNameLower.endsWith(".7z") ||
-                            docNameLower.endsWith(".tar") ||
-                            docNameLower.endsWith(".gz") ||
-                            docNameLower.endsWith(".tgz");
+                            !isRealDoc &&
+                            (fmt === "ZIP" ||
+                              fmt === "RAR" ||
+                              fmt === "7Z" ||
+                              fmt === "TAR" ||
+                              fmt === "GZ" ||
+                              fmt.includes("ZIP") ||
+                              fmt.includes("RAR") ||
+                              docNameLower.endsWith(".zip") ||
+                              docNameLower.endsWith(".rar") ||
+                              docNameLower.endsWith(".7z") ||
+                              docNameLower.endsWith(".tar") ||
+                              docNameLower.endsWith(".gz") ||
+                              docNameLower.endsWith(".tgz"));
+
+                          const isLink =
+                            !isRealDoc &&
+                            !isArchive &&
+                            (fmt === "LINK" ||
+                              fmt === "NOTION" ||
+                              doc.tamano === "Enlace" ||
+                              docNameLower.startsWith("http://") ||
+                              docNameLower.startsWith("https://"));
 
                           const isSelected = selectedMaterialId === `doc_${doc.id_documento}` || selectedMaterial?.name === doc.nombre;
 

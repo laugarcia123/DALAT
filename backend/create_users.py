@@ -21,6 +21,20 @@ def seed_users():
 
     users_data = [
         {
+            "nombre": "Daniel Granados",
+            "email": "danielgaber@gmail.com",
+            "password": "123456hola",
+            "tipo_plan": TipoPlan.PRO,
+            "tokens_disponibles": 150,
+            "fecha_fin_suscripcion": now + timedelta(days=365),
+            "carrera": "Ingeniería de Sistemas",
+            "universidad": "Universidad Nacional",
+            "semestre": "6to Semestre",
+            "es_institucional": False,
+            "avatar_color": "#7c5dfa",
+            "biografia": "Estudiante de ingeniería enfocado en desarrollo y productividad académica.",
+        },
+        {
             "nombre": "Camilo Torres",
             "email": "camilo.torres@gmail.com",
             "password": "password123",

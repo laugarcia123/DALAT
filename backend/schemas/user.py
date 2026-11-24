@@ -48,6 +48,8 @@ class UserUpdate(BaseModel):
     tipo_plan: Optional[TipoPlan] = None
     tokens_disponibles: Optional[int] = None
     meta_semanal_horas: Optional[int] = None
+    record_psicopata: Optional[int] = None
+    victorias_psicopata: Optional[int] = None
     password: Optional[str] = None
 
 
@@ -65,6 +67,8 @@ class UserResponse(BaseModel):
     es_institucional: bool
     tokens_disponibles: Optional[int] = 10
     meta_semanal_horas: Optional[int] = 40
+    record_psicopata: Optional[int] = 0
+    victorias_psicopata: Optional[int] = 0
     is_active: bool
     fecha_fin_suscripcion: Optional[datetime] = None
     fecha_registro: Optional[datetime] = None

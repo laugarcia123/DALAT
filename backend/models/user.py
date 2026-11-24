@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Boolean, DateTime, Enum as SQLEnum
+from sqlalchemy import String, Boolean, DateTime, Integer, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.database import Base
 
@@ -33,6 +33,8 @@ class Usuario(Base):
     tipo_plan: Mapped[TipoPlan] = mapped_column(SQLEnum(TipoPlan), default=TipoPlan.BASICO)
     fecha_fin_suscripcion: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     tokens_disponibles: Mapped[int] = mapped_column(default=10)
+    record_psicopata: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
+    victorias_psicopata: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
 
     # Banderas de estado y auditoría
     meta_semanal_horas: Mapped[int] = mapped_column(default=40)

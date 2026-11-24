@@ -21,7 +21,9 @@ try:
     print("Conectado exitosamente a PostgreSQL:", DATABASE_URL.split("@")[-1])
 except Exception as e:
     # Fallback automatico a SQLite local para permitir desarrollo sin bloquear
-    SQLITE_URL = "sqlite:///./dalat.db"
+    DB_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    SQLITE_PATH = os.path.join(DB_DIR, "dalat.db")
+    SQLITE_URL = f"sqlite:///{SQLITE_PATH}"
     print(f"[BD] PostgreSQL no disponible localmente. Usando SQLite para desarrollo: {SQLITE_URL}")
     engine = create_engine(SQLITE_URL, connect_args={"check_same_thread": False})
 

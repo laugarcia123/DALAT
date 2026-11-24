@@ -41,6 +41,7 @@ import AiResourcesTab from "@/components/tabs/AiResourcesTab";
 import RepositoryTab from "@/components/tabs/RepositoryTab";
 import AmbientAudioPlayer from "@/components/dashboard/AmbientAudioPlayer";
 import WeeklyGoalModal from "@/components/dashboard/WeeklyGoalModal";
+import DatePickerPopover from "@/components/dashboard/DatePickerPopover";
 import ProfileModal, { UserProfile } from "@/components/profile/ProfileModal";
 import LoginScreen from "@/components/auth/LoginScreen";
 import LandingPage from "@/components/landing/LandingPage";
@@ -48,7 +49,9 @@ import CheckoutPage, { SelectedPlan } from "@/components/landing/CheckoutPage";
 import PricingSection from "@/components/landing/PricingSection";
 import AmbientBackground from "@/components/ui/AmbientBackground";
 import { useAuth } from "@/context/AuthContext";
+import { getStoredToken } from "@/lib/api";
 import { taskService } from "@/services/taskService";
+import { subjectService } from "@/services/subjectService";
 import { studySessionService, StudySessionStats } from "@/services/studySessionService";
 
 type ColumnId = "urgente" | "en_progreso" | "para_despues";
@@ -185,7 +188,15 @@ function StreakTooltipBubble() {
 }
 
 export default function StudyDashboard() {
-  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("join_repo") || localStorage.getItem("dalat_pending_invite")) {
+        return "Repositorio";
+      }
+    }
+    return "Dashboard";
+  });
   const [headerDate, setHeaderDate] = useState<string>("");
 
   React.useEffect(() => {
@@ -199,7 +210,15 @@ export default function StudyDashboard() {
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
 
   // User Profile & Authentication State (Real Backend Sync)
-  const { user: authUser, updateProfile: authUpdateProfile, upgradePlan: authUpgradePlan, deductTokens: authDeductTokens, logout: authLogout, isAuthenticated } = useAuth();
+  const {
+    user: authUser,
+    updateProfile: authUpdateProfile,
+    upgradePlan: authUpgradePlan,
+    deductTokens: authDeductTokens,
+    deleteAccount: authDeleteAccount,
+    logout: authLogout,
+    isAuthenticated,
+  } = useAuth();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<"login" | "register">("login");
@@ -285,25 +304,28 @@ export default function StudyDashboard() {
     return 10;
   });
 
-  const handleDeductTokens = async (amount: number) => {
-    setTokensBalance((prev) => {
-      const next = Math.max(0, prev - amount);
-      try {
-        localStorage.setItem("dalat_user_tokens", next.toString());
-      } catch {}
-      return next;
-    });
-
+  const handleDeductTokens = async (amount: number): Promise<number> => {
     try {
       if (isAuthenticated) {
         const newBalance = await authDeductTokens(amount);
-        if (newBalance !== undefined && newBalance !== null && newBalance > 0) {
+        if (typeof newBalance === "number" && !isNaN(newBalance)) {
           setTokensBalance(newBalance);
+          try {
+            localStorage.setItem("dalat_user_tokens", newBalance.toString());
+          } catch {}
+          return newBalance;
         }
       }
     } catch (err) {
       console.warn("[page] Error persistiendo deducción de tokens:", err);
     }
+
+    const fallback = Math.max(0, tokensBalance - amount);
+    setTokensBalance(fallback);
+    try {
+      localStorage.setItem("dalat_user_tokens", fallback.toString());
+    } catch {}
+    return fallback;
   };
 
   const handleGoToCheckout = (plan?: SelectedPlan) => {
@@ -368,20 +390,30 @@ export default function StudyDashboard() {
   const [newTaskDueDate, setNewTaskDueDate] = useState<string | null>(null);
   const [showDateMenu, setShowDateMenu] = useState(false);
 
-  const AVAILABLE_SUBJECTS = [
+  // Registered subjects dynamically loaded from backend
+  const [registeredSubjects, setRegisteredSubjects] = useState<string[]>([]);
+  const availableSubjects = [
     "General",
-    "Matemáticas",
-    "Lectura",
-    "Proyecto",
-    "Repaso",
+    ...registeredSubjects.filter((s) => s.trim().toLowerCase() !== "general"),
   ];
 
-  const SUBJECT_COLORS: Record<string, string> = {
-    "General": "bg-indigo-500",
-    "Matemáticas": "bg-violet-500",
-    "Lectura": "bg-emerald-500",
-    "Proyecto": "bg-amber-500",
-    "Repaso": "bg-rose-500",
+  const getSubjectColor = (subj: string) => {
+    if (subj === "General") return "bg-indigo-500";
+    const colors = [
+      "bg-violet-500",
+      "bg-emerald-500",
+      "bg-amber-500",
+      "bg-rose-500",
+      "bg-cyan-500",
+      "bg-fuchsia-500",
+      "bg-blue-500",
+      "bg-teal-500",
+    ];
+    let hash = 0;
+    for (let i = 0; i < subj.length; i++) {
+      hash = subj.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
   };
 
   // Mobile board column filter tab
@@ -479,7 +511,7 @@ export default function StudyDashboard() {
 
   // Cargar estadísticas de estudio (racha, horas de la semana, meta personalizada)
   const loadStudyStats = React.useCallback(async (goalOverride?: number) => {
-    if (!authUser) {
+    if (!authUser && !getStoredToken()) {
       setStudyStats(null);
       return;
     }
@@ -502,7 +534,7 @@ export default function StudyDashboard() {
     } catch (err) {
       console.warn("No se pudieron cargar las estadísticas de estudio:", err);
     }
-  }, []);
+  }, [authUser]);
 
   React.useEffect(() => {
     void (async () => {
@@ -578,12 +610,32 @@ export default function StudyDashboard() {
     }
   }, [isAuthenticated, authUser?.id, authUser?.email]);
 
+  // Cargar materias reales desde el backend para el selector de tareas
+  const loadUserSubjects = React.useCallback(async () => {
+    if (!isAuthenticated || !authUser) {
+      setRegisteredSubjects([]);
+      return;
+    }
+    try {
+      const subs = await subjectService.getSubjects();
+      if (subs && Array.isArray(subs)) {
+        setRegisteredSubjects(subs.map((s) => s.nombre));
+      } else {
+        setRegisteredSubjects([]);
+      }
+    } catch (err) {
+      console.warn("No se pudieron cargar las materias:", err);
+      setRegisteredSubjects([]);
+    }
+  }, [isAuthenticated, authUser?.id, authUser?.email]);
+
   React.useEffect(() => {
     void (async () => {
       setTasks([]);
       await loadTasks();
+      await loadUserSubjects();
     })();
-  }, [loadTasks, authUser?.id, authUser?.email]);
+  }, [loadTasks, loadUserSubjects, authUser?.id, authUser?.email, activeTab]);
 
   // Zen timer effect
   React.useEffect(() => {
@@ -622,11 +674,11 @@ export default function StudyDashboard() {
       prev.map((t) => (t.id === id ? { ...t, completed: nextCompleted } : t))
     );
 
-    if (targetTask.backendId) {
+    if (targetTask.backendId && isAuthenticated && getStoredToken()) {
       try {
         await taskService.updateTask(targetTask.backendId, { completada: nextCompleted });
       } catch (err) {
-        console.error("Error al actualizar tarea en backend:", err);
+        console.warn("No se pudo actualizar la tarea en el servidor:", err);
       }
     }
   };
@@ -640,11 +692,11 @@ export default function StudyDashboard() {
       prev.map((t) => (t.id === id ? { ...t, column: newColumn } : t))
     );
 
-    if (targetTask.backendId) {
+    if (targetTask.backendId && isAuthenticated && getStoredToken()) {
       try {
         await taskService.updateTask(targetTask.backendId, { columna: newColumn });
       } catch (err) {
-        console.error("Error al mover tarea en backend:", err);
+        console.warn("No se pudo mover la tarea en el servidor:", err);
       }
     }
   };
@@ -654,11 +706,11 @@ export default function StudyDashboard() {
     const targetTask = tasks.find((t) => t.id === id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
 
-    if (targetTask?.backendId) {
+    if (targetTask?.backendId && isAuthenticated && getStoredToken()) {
       try {
         await taskService.deleteTask(targetTask.backendId);
       } catch (err) {
-        console.error("Error al eliminar tarea en backend:", err);
+        console.warn("No se pudo eliminar la tarea en el servidor:", err);
       }
     }
   };
@@ -685,7 +737,7 @@ export default function StudyDashboard() {
     setNewTaskTitle("");
     setNewTaskDueDate(null);
 
-    if (isAuthenticated) {
+    if (isAuthenticated && getStoredToken()) {
       try {
         const created = await taskService.createTask({
           titulo: title,
@@ -700,7 +752,7 @@ export default function StudyDashboard() {
           )
         );
       } catch (err) {
-        console.error("Error al guardar tarea en backend:", err);
+        console.warn("No se pudo guardar la tarea en el servidor:", err);
       }
     }
   };
@@ -721,7 +773,7 @@ export default function StudyDashboard() {
     "Dashboard",
     "Horario",
     "Métodos",
-    "Notas",
+    "Materias",
     "Recursos IA",
     "Repositorio",
   ];
@@ -900,7 +952,7 @@ export default function StudyDashboard() {
                     : "bg-[#21183c] border border-[#3c2a6d] text-[#a78bfa]"
                 }`}
               >
-                <Sparkles className="w-5 h-5" />
+                <Target className="w-5 h-5" />
               </div>
               <div>
                 <h3
@@ -999,7 +1051,7 @@ export default function StudyDashboard() {
                     }`}
                   >
                     <div className="px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-[#1d2240] text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                      Seleccionar Asignatura
+                      Seleccionar Materia
                     </div>
                     <div className="space-y-0.5">
                       {ZEN_SUBJECTS.map((sub) => {
@@ -1247,7 +1299,7 @@ export default function StudyDashboard() {
               >
                 <Flame className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0 drop-shadow-xs" />
                 <span className="font-extrabold text-xs sm:text-sm font-mono text-amber-600 dark:text-amber-400">
-                  {studyStats ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)}
+                  {studyStats !== null && studyStats !== undefined ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)}
                 </span>
               </div>
 
@@ -1504,8 +1556,8 @@ export default function StudyDashboard() {
                       <Flame className="w-3.5 h-3.5 text-amber-400" />
                       <span>
                         <strong className="text-white font-semibold">
-                          {studyStats ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)}{" "}
-                          {(studyStats ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)) === 1 ? "día" : "días"}
+                          {studyStats !== null && studyStats !== undefined ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)}{" "}
+                          {(studyStats !== null && studyStats !== undefined ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)) === 1 ? "día" : "días"}
                         </strong>{" "}
                         de racha
                       </span>
@@ -1692,7 +1744,7 @@ export default function StudyDashboard() {
                         />
                         <div
                           role="menu"
-                          className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border shadow-2xl p-1.5 z-30 space-y-0.5 text-xs animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md ${
+                          className={`absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-2xl p-1.5 z-30 space-y-0.5 text-xs animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md ${
                             isLightMode
                               ? "bg-white/95 border-slate-200/90 shadow-slate-900/15"
                               : "bg-[#101322]/95 border-white/[0.12] shadow-black/80"
@@ -1701,7 +1753,7 @@ export default function StudyDashboard() {
                           <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none">
                             Materia de estudio
                           </div>
-                          {AVAILABLE_SUBJECTS.map((subj) => {
+                          {availableSubjects.map((subj) => {
                             const isSelected = selectedSubject === subj;
                             return (
                               <button
@@ -1723,7 +1775,7 @@ export default function StudyDashboard() {
                                 }`}
                               >
                                 <span className="flex items-center gap-2 truncate">
-                                  <span className={`w-2 h-2 rounded-full shrink-0 ${SUBJECT_COLORS[subj] || "bg-violet-400"}`} />
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${getSubjectColor(subj)}`} />
                                   <span className="truncate">{subj}</span>
                                 </span>
                                 {isSelected && (
@@ -1732,6 +1784,27 @@ export default function StudyDashboard() {
                               </button>
                             );
                           })}
+
+                          {registeredSubjects.length === 0 && (
+                            <div className={`mt-1.5 pt-2 border-t px-2 pb-1 ${
+                              isLightMode ? "border-slate-100" : "border-white/[0.08]"
+                            }`}>
+                              <p className="text-[11px] leading-snug text-slate-400">
+                                Registra materias para poder elegirlas en tus tareas.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowSubjectMenu(false);
+                                  setActiveTab("Materias");
+                                }}
+                                className="mt-1.5 text-[11px] font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <span>Ir a Materias</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
@@ -1778,55 +1851,12 @@ export default function StudyDashboard() {
                     </button>
 
                     {showDateMenu && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-20"
-                          onClick={() => setShowDateMenu(false)}
-                        />
-                        <div
-                          role="menu"
-                          className={`absolute right-0 top-full mt-2 w-64 rounded-2xl border shadow-2xl p-3 z-30 space-y-2.5 text-xs animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md ${
-                            isLightMode
-                              ? "bg-white/95 border-slate-200/90 shadow-slate-900/15"
-                              : "bg-[#101322]/95 border-white/[0.12] shadow-black/80"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none">
-                              Fecha de entrega
-                            </span>
-                            {newTaskDueDate && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setNewTaskDueDate(null);
-                                  setShowDateMenu(false);
-                                }}
-                                className="text-[11px] text-rose-400 hover:text-rose-300 font-semibold transition cursor-pointer"
-                              >
-                                Quitar fecha
-                              </button>
-                            )}
-                          </div>
-
-                          <div>
-                            <input
-                              type="date"
-                              autoFocus
-                              value={newTaskDueDate || ""}
-                              onChange={(e) => {
-                                setNewTaskDueDate(e.target.value || null);
-                                if (e.target.value) setShowDateMenu(false);
-                              }}
-                              className={`w-full px-3 py-2 rounded-xl border text-xs outline-none transition cursor-pointer ${
-                                isLightMode
-                                  ? "bg-slate-50 hover:bg-white border-slate-300 text-slate-900 focus:border-purple-500 focus:bg-white"
-                                  : "bg-[#0b0e1a] hover:bg-[#121628] border-white/[0.14] text-white focus:border-purple-400"
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      </>
+                      <DatePickerPopover
+                        value={newTaskDueDate}
+                        onChange={(d) => setNewTaskDueDate(d)}
+                        onClose={() => setShowDateMenu(false)}
+                        isLightMode={isLightMode}
+                      />
                     )}
                   </div>
 
@@ -2476,7 +2506,7 @@ export default function StudyDashboard() {
                 {/* Widget 2: Modo Zen Card */}
                 <div className="rounded-2xl bg-[#0c0e18] border border-white/[0.08] p-6 space-y-4">
                   <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
+                    <Target className="w-5 h-5 text-purple-400" />
                   </div>
 
                   <div className="space-y-1.5">
@@ -2492,9 +2522,8 @@ export default function StudyDashboard() {
                       setZenMode(true);
                       setZenRunning(true);
                     }}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs tracking-wide shadow-md shadow-purple-900/20 transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs tracking-wide shadow-md shadow-purple-900/20 transition active:scale-[0.98] flex items-center justify-center cursor-pointer"
                   >
-                    <Sparkles className="w-4 h-4 text-white" />
                     <span className="text-white">Activar modo zen</span>
                   </button>
                 </div>
@@ -2524,8 +2553,8 @@ export default function StudyDashboard() {
           </div>
         )}
 
-        {/* Render Tab 4: Notas */}
-        {activeTab === "Notas" && (
+        {/* Render Tab 4: Materias */}
+        {activeTab === "Materias" && (
           <div className="animate-in fade-in duration-150">
             <NotesTab isLightMode={isLightMode} />
           </div>
@@ -2580,6 +2609,12 @@ export default function StudyDashboard() {
           } catch (err) {
             console.warn("[Profile] Error al sincronizar con backend:", err);
           }
+        }}
+        onDeleteAccount={async () => {
+          await authDeleteAccount();
+          setProfileModalOpen(false);
+          setIsLoggedIn(false);
+          window.location.reload();
         }}
       />
 

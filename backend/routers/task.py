@@ -17,6 +17,7 @@ from crud.task import (
 router = APIRouter(prefix="/tareas", tags=["Tareas & Kanban"])
 
 
+@router.get("", response_model=List[TareaResponse])
 @router.get("/", response_model=List[TareaResponse])
 def listar_tareas_usuario(
     current_user: Usuario = Depends(get_current_user),
@@ -28,6 +29,7 @@ def listar_tareas_usuario(
     return get_user_tasks(db, user_id=current_user.id_usuario)
 
 
+@router.post("", response_model=TareaResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=TareaResponse, status_code=status.HTTP_201_CREATED)
 def crear_nueva_tarea(
     task_in: TareaCreate,

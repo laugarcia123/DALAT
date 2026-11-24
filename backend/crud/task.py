@@ -18,7 +18,7 @@ DEFAULT_TASKS_DATA = [
 
 
 def get_user_tasks(db: Session, user_id: int) -> List[Tarea]:
-    """Lista todas las tareas de un usuario ordenadas por ID descendente."""
+    """Lista todas las tareas de un usuario ordenadas por ID ascendente."""
     return (
         db.query(Tarea)
         .filter(Tarea.id_usuario == user_id)

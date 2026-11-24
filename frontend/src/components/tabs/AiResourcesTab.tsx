@@ -263,28 +263,6 @@ export default function AiResourcesTab({
         const mapped: MaterialFile[] = docs.map((doc: DocumentoItem) => {
           const fmt = (doc.formato || "").toUpperCase();
           const docNameLower = doc.nombre.toLowerCase();
-          const isLink =
-            fmt === "LINK" ||
-            fmt === "NOTION" ||
-            doc.tamano === "Enlace" ||
-            Boolean(doc.url_recurso?.startsWith("http")) ||
-            docNameLower.startsWith("http");
-
-          const isArchive =
-            fmt === "ZIP" ||
-            fmt === "RAR" ||
-            fmt === "7Z" ||
-            fmt === "TAR" ||
-            fmt === "GZ" ||
-            fmt.includes("ZIP") ||
-            fmt.includes("RAR") ||
-            docNameLower.endsWith(".zip") ||
-            docNameLower.endsWith(".rar") ||
-            docNameLower.endsWith(".7z") ||
-            docNameLower.endsWith(".tar") ||
-            docNameLower.endsWith(".gz") ||
-            docNameLower.endsWith(".tgz");
-
           const isDocx =
             fmt.includes("DOC") ||
             fmt.includes("WORD") ||
@@ -301,6 +279,37 @@ export default function AiResourcesTab({
             fmt.includes("MD") ||
             docNameLower.endsWith(".txt") ||
             docNameLower.endsWith(".md");
+
+          const isPdf =
+            fmt.includes("PDF") ||
+            docNameLower.endsWith(".pdf");
+
+          const isRealDoc = isDocx || isPpt || isTxt || isPdf;
+
+          const isArchive =
+            !isRealDoc &&
+            (fmt === "ZIP" ||
+              fmt === "RAR" ||
+              fmt === "7Z" ||
+              fmt === "TAR" ||
+              fmt === "GZ" ||
+              fmt.includes("ZIP") ||
+              fmt.includes("RAR") ||
+              docNameLower.endsWith(".zip") ||
+              docNameLower.endsWith(".rar") ||
+              docNameLower.endsWith(".7z") ||
+              docNameLower.endsWith(".tar") ||
+              docNameLower.endsWith(".gz") ||
+              docNameLower.endsWith(".tgz"));
+
+          const isLink =
+            !isRealDoc &&
+            !isArchive &&
+            (fmt === "LINK" ||
+              fmt === "NOTION" ||
+              doc.tamano === "Enlace" ||
+              docNameLower.startsWith("http://") ||
+              docNameLower.startsWith("https://"));
 
           const ext: "pdf" | "docx" | "txt" | "ppt" | "link" | "zip" = isLink
             ? "link"
@@ -890,131 +899,133 @@ export default function AiResourcesTab({
               </div>
             </div>
 
-            {/* Optimización & Cantidad */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end pt-1">
-              <div className="space-y-1.5 relative" ref={engineDropdownRef}>
-                <div className="flex items-center justify-between">
-                  <label className={`block text-xs font-semibold ${activeLight ? "text-slate-700" : "text-slate-300"}`}>
-                    Modelo de Optimización
-                  </label>
-                  {resourceType === "Guia" && (
-                    <span className="text-[10px] text-amber-500 font-medium">
-                      Exclusivo Opción 2
-                    </span>
+            {/* Optimización & Cantidad (Solo visible para formatos individuales: Examen, Flashcards, Resumen, Guía) */}
+            {resourceType !== "Pack_General" && resourceType !== "Pack_Matematicas" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end pt-1">
+                <div className="space-y-1.5 relative" ref={engineDropdownRef}>
+                  <div className="flex items-center justify-between">
+                    <label className={`block text-xs font-semibold ${activeLight ? "text-slate-700" : "text-slate-300"}`}>
+                      Modelo de Optimización
+                    </label>
+                    {resourceType === "Guia" && (
+                      <span className="text-[10px] text-amber-500 font-medium">
+                        Exclusivo Opción 2
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Custom Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={() => setEngineDropdownOpen((prev) => !prev)}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-medium transition flex items-center justify-between gap-2 border cursor-pointer select-none ${
+                      activeLight
+                        ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-900 shadow-xs focus:ring-2 focus:ring-purple-100 focus:border-purple-400"
+                        : "bg-[#080912] hover:bg-[#0f1222] border-[#1e2338] text-white focus:border-[#7c5dfa]"
+                    }`}
+                  >
+                    {(() => {
+                      const currentOpt =
+                        OPTIMIZATION_OPTIONS.find((d) => d.id === effectiveEngineOption) ||
+                        OPTIMIZATION_OPTIONS[0];
+                      return (
+                        <div className="flex items-center gap-2 truncate">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${currentOpt.bgDot}`} />
+                          <span className="font-bold">{currentOpt.title}</span>
+                          <span className={`text-[11px] truncate hidden sm:inline ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
+                            — {currentOpt.badge}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                        engineDropdownOpen ? "rotate-180 text-purple-600 dark:text-purple-400" : "text-slate-400"
+                      }`}
+                    />
+                  </button>
+
+                  {/* Custom Floating Popover Menu */}
+                  {engineDropdownOpen && (
+                    <div
+                      className={`absolute left-0 right-0 top-full mt-1.5 z-40 p-1.5 rounded-2xl border shadow-xl animate-in fade-in-50 zoom-in-95 duration-150 space-y-1 ${
+                        activeLight
+                          ? "bg-white/95 backdrop-blur-md border-slate-200/90 shadow-slate-200/60"
+                          : "bg-[#0d1020]/95 backdrop-blur-md border-[#222946] shadow-black/60"
+                      }`}
+                    >
+                      {OPTIMIZATION_OPTIONS.map((opt) => {
+                        const isSelected = effectiveEngineOption === opt.id;
+                        const isGuiaDisabled = resourceType === "Guia" && opt.id === "opcion_1";
+
+                        return (
+                          <div
+                            key={opt.id}
+                            onClick={() => {
+                              if (isGuiaDisabled) return;
+                              setEngineOption(opt.id);
+                              setEngineDropdownOpen(false);
+                            }}
+                            className={`px-3 py-2.5 rounded-xl text-xs transition flex items-center justify-between gap-3 ${
+                              isGuiaDisabled
+                                ? "opacity-40 cursor-not-allowed bg-transparent"
+                                : "cursor-pointer"
+                            } ${
+                              isSelected
+                                ? activeLight
+                                  ? "bg-purple-50 text-purple-900 font-bold"
+                                  : "bg-purple-950/50 text-purple-200 font-bold"
+                                : activeLight
+                                ? "hover:bg-slate-100 text-slate-700"
+                                : "hover:bg-[#151930] text-slate-300 hover:text-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 truncate">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${opt.bgDot}`} />
+                              <div className="truncate">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold">{opt.title}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.2 rounded ${
+                                    activeLight ? "bg-slate-200 text-slate-700 font-medium" : "bg-white/[0.06] text-slate-300"
+                                  }`}>
+                                    {opt.badge}
+                                  </span>
+                                </div>
+                                <span className={`text-[10px] block truncate ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
+                                  {isGuiaDisabled ? "No disponible para Guía paso a paso" : opt.description}
+                                </span>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" strokeWidth={2.5} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 
-                {/* Custom Trigger Button */}
-                <button
-                  type="button"
-                  onClick={() => setEngineDropdownOpen((prev) => !prev)}
-                  className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-medium transition flex items-center justify-between gap-2 border cursor-pointer select-none ${
-                    activeLight
-                      ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-900 shadow-xs focus:ring-2 focus:ring-purple-100 focus:border-purple-400"
-                      : "bg-[#080912] hover:bg-[#0f1222] border-[#1e2338] text-white focus:border-[#7c5dfa]"
-                  }`}
-                >
-                  {(() => {
-                    const currentOpt =
-                      OPTIMIZATION_OPTIONS.find((d) => d.id === effectiveEngineOption) ||
-                      OPTIMIZATION_OPTIONS[0];
-                    return (
-                      <div className="flex items-center gap-2 truncate">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${currentOpt.bgDot}`} />
-                        <span className="font-bold">{currentOpt.title}</span>
-                        <span className={`text-[11px] truncate hidden sm:inline ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
-                          — {currentOpt.badge}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                  <ChevronDown
-                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                      engineDropdownOpen ? "rotate-180 text-purple-600 dark:text-purple-400" : "text-slate-400"
-                    }`}
-                  />
-                </button>
-
-                {/* Custom Floating Popover Menu */}
-                {engineDropdownOpen && (
-                  <div
-                    className={`absolute left-0 right-0 top-full mt-1.5 z-40 p-1.5 rounded-2xl border shadow-xl animate-in fade-in-50 zoom-in-95 duration-150 space-y-1 ${
-                      activeLight
-                        ? "bg-white/95 backdrop-blur-md border-slate-200/90 shadow-slate-200/60"
-                        : "bg-[#0d1020]/95 backdrop-blur-md border-[#222946] shadow-black/60"
-                    }`}
-                  >
-                    {OPTIMIZATION_OPTIONS.map((opt) => {
-                      const isSelected = effectiveEngineOption === opt.id;
-                      const isGuiaDisabled = resourceType === "Guia" && opt.id === "opcion_1";
-
-                      return (
-                        <div
-                          key={opt.id}
-                          onClick={() => {
-                            if (isGuiaDisabled) return;
-                            setEngineOption(opt.id);
-                            setEngineDropdownOpen(false);
-                          }}
-                          className={`px-3 py-2.5 rounded-xl text-xs transition flex items-center justify-between gap-3 ${
-                            isGuiaDisabled
-                              ? "opacity-40 cursor-not-allowed bg-transparent"
-                              : "cursor-pointer"
-                          } ${
-                            isSelected
-                              ? activeLight
-                                ? "bg-purple-50 text-purple-900 font-bold"
-                                : "bg-purple-950/50 text-purple-200 font-bold"
-                              : activeLight
-                              ? "hover:bg-slate-100 text-slate-700"
-                              : "hover:bg-[#151930] text-slate-300 hover:text-white"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 truncate">
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${opt.bgDot}`} />
-                            <div className="truncate">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">{opt.title}</span>
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded ${
-                                  activeLight ? "bg-slate-200 text-slate-700 font-medium" : "bg-white/[0.06] text-slate-300"
-                                }`}>
-                                  {opt.badge}
-                                </span>
-                              </div>
-                              <span className={`text-[10px] block truncate ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
-                                {isGuiaDisabled ? "No disponible para Guía paso a paso" : opt.description}
-                              </span>
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <Check className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" strokeWidth={2.5} />
-                          )}
-                        </div>
-                      );
-                    })}
+                {(resourceType === "Examen" || resourceType === "Flashcards") && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className={activeLight ? "text-slate-600 font-medium" : "text-slate-400"}>Cantidad de preguntas:</span>
+                      <span className={`font-extrabold ${activeLight ? "text-purple-700" : "text-white"}`}>
+                        {Math.min(questionCount, maxQuestionCount)}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={3}
+                      max={maxQuestionCount}
+                      value={Math.min(questionCount, maxQuestionCount)}
+                      onChange={(e) => setQuestionCount(Number(e.target.value))}
+                      className={`w-full accent-purple-600 h-1.5 rounded-lg cursor-pointer ${activeLight ? "bg-slate-200" : "bg-[#181d30]"}`}
+                    />
                   </div>
                 )}
               </div>
-
-              {(resourceType === "Examen" || resourceType === "Flashcards") && (
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className={activeLight ? "text-slate-600 font-medium" : "text-slate-400"}>Cantidad de preguntas:</span>
-                    <span className={`font-extrabold ${activeLight ? "text-purple-700" : "text-white"}`}>
-                      {Math.min(questionCount, maxQuestionCount)}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={3}
-                    max={maxQuestionCount}
-                    value={Math.min(questionCount, maxQuestionCount)}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className={`w-full accent-purple-600 h-1.5 rounded-lg cursor-pointer ${activeLight ? "bg-slate-200" : "bg-[#181d30]"}`}
-                  />
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Botón de Generar y Cálculo Dinámico de Tokens */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
@@ -2029,27 +2040,53 @@ export default function AiResourcesTab({
                       {filteredDocs.map((doc) => {
                         const fmt = (doc.formato || "").toUpperCase();
                         const docNameLower = doc.nombre.toLowerCase();
-                        const isLink =
-                          fmt === "LINK" ||
-                          fmt === "NOTION" ||
-                          doc.tamano === "Enlace" ||
-                          Boolean(doc.url_recurso?.startsWith("http")) ||
-                          docNameLower.startsWith("http");
+                        const isDocx =
+                          fmt.includes("DOC") ||
+                          fmt.includes("WORD") ||
+                          docNameLower.endsWith(".docx") ||
+                          docNameLower.endsWith(".doc");
+
+                        const isPpt =
+                          fmt.includes("PPT") ||
+                          docNameLower.endsWith(".pptx") ||
+                          docNameLower.endsWith(".ppt");
+
+                        const isTxt =
+                          fmt.includes("TXT") ||
+                          fmt.includes("MD") ||
+                          docNameLower.endsWith(".txt") ||
+                          docNameLower.endsWith(".md");
+
+                        const isPdf =
+                          fmt.includes("PDF") ||
+                          docNameLower.endsWith(".pdf");
+
+                        const isRealDoc = isDocx || isPpt || isTxt || isPdf;
 
                         const isArchive =
-                          fmt === "ZIP" ||
-                          fmt === "RAR" ||
-                          fmt === "7Z" ||
-                          fmt === "TAR" ||
-                          fmt === "GZ" ||
-                          fmt.includes("ZIP") ||
-                          fmt.includes("RAR") ||
-                          docNameLower.endsWith(".zip") ||
-                          docNameLower.endsWith(".rar") ||
-                          docNameLower.endsWith(".7z") ||
-                          docNameLower.endsWith(".tar") ||
-                          docNameLower.endsWith(".gz") ||
-                          docNameLower.endsWith(".tgz");
+                          !isRealDoc &&
+                          (fmt === "ZIP" ||
+                            fmt === "RAR" ||
+                            fmt === "7Z" ||
+                            fmt === "TAR" ||
+                            fmt === "GZ" ||
+                            fmt.includes("ZIP") ||
+                            fmt.includes("RAR") ||
+                            docNameLower.endsWith(".zip") ||
+                            docNameLower.endsWith(".rar") ||
+                            docNameLower.endsWith(".7z") ||
+                            docNameLower.endsWith(".tar") ||
+                            docNameLower.endsWith(".gz") ||
+                            docNameLower.endsWith(".tgz"));
+
+                        const isLink =
+                          !isRealDoc &&
+                          !isArchive &&
+                          (fmt === "LINK" ||
+                            fmt === "NOTION" ||
+                            doc.tamano === "Enlace" ||
+                            docNameLower.startsWith("http://") ||
+                            docNameLower.startsWith("https://"));
 
                         const isSelected = selectedFileId === `doc_${doc.id_documento}` || selectedFile?.name === doc.nombre;
 

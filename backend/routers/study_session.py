@@ -59,6 +59,7 @@ def listar_sesiones_recientes(
     return get_user_sesiones(db, user_id=current_user.id_usuario, limit=limit)
 
 
+@router.post("", response_model=SesionResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=SesionResponse, status_code=status.HTTP_201_CREATED)
 def registrar_sesion_estudio(
     sesion_in: SesionCreate,

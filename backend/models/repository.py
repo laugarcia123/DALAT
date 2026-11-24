@@ -24,6 +24,21 @@ class EquipoEstudio(Base):
     # Relaciones
     usuario = relationship("Usuario", backref="equipos_creados")
     documentos = relationship("DocumentoRepositorio", back_populates="equipo", cascade="all, delete-orphan")
+    miembros = relationship("MiembroEquipo", back_populates="equipo", cascade="all, delete-orphan")
+
+
+class MiembroEquipo(Base):
+    __tablename__ = "equipo_miembros"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    id_equipo = Column(Integer, ForeignKey("equipos_estudio.id_equipo", ondelete="CASCADE"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="CASCADE"), nullable=False, index=True)
+    rol = Column(String(50), default="miembro")  # creador, miembro
+    fecha_union = Column(DateTime, default=datetime.utcnow)
+
+    # Relaciones
+    equipo = relationship("EquipoEstudio", back_populates="miembros")
+    usuario = relationship("Usuario", backref="equipos_unidos")
 
 
 class DocumentoRepositorio(Base):

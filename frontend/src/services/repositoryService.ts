@@ -27,6 +27,9 @@ export interface EquipoItem {
   documentos_count: number;
   fecha_creacion?: string;
   documentos?: DocumentoItem[];
+  es_miembro?: boolean;
+  es_creador?: boolean;
+  rol_usuario?: string;
 }
 
 export interface EquipoCreatePayload {
@@ -99,6 +102,27 @@ export const repositoryService = {
       `/repositorio/equipos/${id_equipo}`,
       { method: "DELETE" }
     );
+  },
+
+  /**
+   * Previsualiza los datos de un equipo por código de invitación (público).
+   */
+  async previewEquipo(codigoInvitacion: string): Promise<EquipoItem> {
+    const clean = codigoInvitacion.trim();
+    return apiFetch<EquipoItem>(`/repositorio/equipos/preview/${encodeURIComponent(clean)}`, {
+      requiresAuth: false,
+    });
+  },
+
+  /**
+   * Une al usuario autenticado a un equipo mediante su código de invitación.
+   */
+  async unirseEquipo(codigoInvitacion: string): Promise<EquipoItem> {
+    const clean = codigoInvitacion.trim();
+    return apiFetch<EquipoItem>(`/repositorio/equipos/${encodeURIComponent(clean)}/unirse`, {
+      method: "POST",
+      requiresAuth: true,
+    });
   },
 
   /**

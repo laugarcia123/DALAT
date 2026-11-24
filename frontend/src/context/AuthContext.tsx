@@ -19,6 +19,8 @@ export interface UserProfile {
   targetGpa?: string;
   studyStreakDays?: number;
   totalStudyHours?: number;
+  recordPsicopata?: number;
+  victoriasPsicopata?: number;
 }
 
 interface AuthContextType {
@@ -32,6 +34,7 @@ interface AuthContextType {
   updateProfile: (updatedData: Partial<UserProfile>) => Promise<UserProfile>;
   upgradePlan: (plan: string, tokens?: number) => Promise<UserProfile>;
   deductTokens: (amount: number) => Promise<number>;
+  deleteAccount: () => Promise<void>;
   logout: () => void;
   clearError: () => void;
 }
@@ -54,6 +57,8 @@ function mapBackendUserToProfile(backendUser: UserBackend): UserProfile {
     targetGpa: "4.5 / 5.0",
     studyStreakDays: 0,
     totalStudyHours: 0,
+    recordPsicopata: backendUser.record_psicopata || 0,
+    victoriasPsicopata: backendUser.victorias_psicopata || 0,
   };
 }
 
@@ -223,6 +228,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return 0;
   };
 
+  const deleteAccount = async (): Promise<void> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await authService.deleteAccount();
+      setUser(null);
+      setIsAuthenticated(false);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.clear();
+        } catch {}
+      }
+    } catch (err: any) {
+      const message = err?.message || "Error al eliminar la cuenta.";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     authService.logout();
     setIsAuthenticated(false);
@@ -244,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateProfile,
         upgradePlan,
         deductTokens,
+        deleteAccount,
         logout,
         clearError,
       }}

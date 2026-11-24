@@ -65,3 +65,42 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[Usuari
     if not verify_password(password, user.password_hash):
         return None
     return user
+
+
+def delete_user_account(db: Session, db_user: Usuario) -> bool:
+    """Elimina permanentemente la cuenta de usuario y todos sus datos relacionados."""
+    user_id = db_user.id_usuario
+    from models.task import Tarea
+    from models.schedule import HorarioClase
+    from models.study_session import SesionEstudio
+    from models.repository import DocumentoRepositorio, MiembroEquipo, EquipoEstudio
+    from models.subject import Asignatura, Evaluacion
+
+    # 1. Eliminar tareas
+    db.query(Tarea).filter(Tarea.id_usuario == user_id).delete(synchronize_session=False)
+
+    # 2. Eliminar horarios de clase
+    db.query(HorarioClase).filter(HorarioClase.id_usuario == user_id).delete(synchronize_session=False)
+
+    # 3. Eliminar sesiones de estudio
+    db.query(SesionEstudio).filter(SesionEstudio.id_usuario == user_id).delete(synchronize_session=False)
+
+    # 4. Eliminar documentos del repositorio
+    db.query(DocumentoRepositorio).filter(DocumentoRepositorio.id_usuario == user_id).delete(synchronize_session=False)
+
+    # 5. Eliminar membresías de equipos
+    db.query(MiembroEquipo).filter(MiembroEquipo.id_usuario == user_id).delete(synchronize_session=False)
+
+    # 6. Eliminar equipos creados por el usuario
+    db.query(EquipoEstudio).filter(EquipoEstudio.id_usuario == user_id).delete(synchronize_session=False)
+
+    # 7. Eliminar evaluaciones y asignaturas
+    asignaturas = db.query(Asignatura).filter(Asignatura.id_usuario == user_id).all()
+    for asig in asignaturas:
+        db.query(Evaluacion).filter(Evaluacion.id_asignatura == asig.id_asignatura).delete(synchronize_session=False)
+    db.query(Asignatura).filter(Asignatura.id_usuario == user_id).delete(synchronize_session=False)
+
+    # 8. Eliminar el registro del usuario
+    db.delete(db_user)
+    db.commit()
+    return True

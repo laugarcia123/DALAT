@@ -75,6 +75,27 @@ def generar_con_gemini(req: GenerarRecursoRequest, api_key: str) -> Any:
             "  }\n"
             "]"
         )
+    elif tipo in ("psicopata", "psicopata_challenge"):
+        prompt = (
+            f"Actúa como un profesor universitario titular y examinador de élite en '{materia}'. "
+            f"Diseña un desafío riguroso de Muerte Súbita (Método Psicópata) con exactamente {cantidad} preguntas de análisis crítico "
+            f"sobre el documento o tema '{tema}'. Nivel de exigencia: PREGRADO UNIVERSITARIO AVANZADO.{contexto_prompt}\n\n"
+            "DIRECTRICES OBLIGATORIAS (CERO MARGEN DE ERROR):\n"
+            "1. NO OPTIMIZADO PARA CÁLCULOS MATEMÁTICOS O FÍSICA NUMÉRICA. Este desafío está enfocado en comprensión conceptual profunda, definiciones técnicas exactas, relaciones causales, mecanismos doctrinales, clínicos, históricos o epistemológicos, y resolución analítica.\n"
+            "2. EXIGENCIA DE ALTO NIVEL: Cada pregunta debe desafiar el razonamiento del estudiante. Se prohíben preguntas obvias o de memorización superficial.\n"
+            "3. 4 OPCIONES HOMOGÉNEAS Y PLAUSIBLES: Las 3 opciones incorrectas (distractores) deben representar confusiones teóricas reales y sofisticadas de estudiantes universitarios. Ningún distractor debe ser ingenuo ni descartable a simple vista.\n"
+            "4. EXPLICACIÓN RIGUROSA: La explicación pedagógica debe justificar por qué la opción seleccionada es la verdadera y por qué las alternativas fallan.\n\n"
+            "Responde EXCLUSIVAMENTE con un arreglo JSON válido (sin código markdown ```json extra):\n"
+            "[\n"
+            "  {\n"
+            '    "id": 1,\n'
+            '    "pregunta": "¿Pregunta analítica profunda de nivel universitario?",\n'
+            '    "opciones": ["Opción correcta", "Distractor plausible 1", "Distractor plausible 2", "Distractor plausible 3"],\n'
+            '    "indice_correcto": 0,\n'
+            '    "explicacion": "Demostración y justificación pedagógica completa..."\n'
+            "  }\n"
+            "]"
+        )
     elif tipo == "flashcards":
         prompt = (
             f"Actúa como un profesor y tutor universitario en '{materia}'. "
@@ -92,6 +113,27 @@ def generar_con_gemini(req: GenerarRecursoRequest, api_key: str) -> Any:
             '    "reverso": "Explicación rigurosa del principio subyacente...",\n'
             '    "categoria": "Teorema o Subtema",\n'
             f'    "dificultad": "{dificultad}"\n'
+            "  }\n"
+            "]"
+        )
+    elif tipo in ("psicopata", "psicopata_challenge"):
+        prompt = (
+            f"Actúa como un profesor universitario titular y examinador de élite en '{materia}'. "
+            f"Diseña un desafío riguroso de Muerte Súbita (Método Psicópata) con exactamente {cantidad} preguntas de análisis crítico "
+            f"sobre el documento o tema '{tema}'. Nivel de exigencia: PREGRADO UNIVERSITARIO AVANZADO.{contexto_prompt}\n\n"
+            "DIRECTRICES OBLIGATORIAS (CERO MARGEN DE ERROR):\n"
+            "1. NO OPTIMIZADO PARA CÁLCULOS MATEMÁTICOS O FÍSICA NUMÉRICA. Este desafío está enfocado en comprensión conceptual profunda, definiciones técnicas exactas, relaciones causales, mecanismos doctrinales, clínicos, históricos o epistemológicos, y resolución analítica.\n"
+            "2. EXIGENCIA DE ALTO NIVEL: Cada pregunta debe desafiar el razonamiento del estudiante. Se prohíben preguntas obvias o de memorización superficial.\n"
+            "3. 4 OPCIONES HOMOGÉNEAS Y PLAUSIBLES: Las 3 opciones incorrectas (distractores) deben representar confusiones teóricas reales y sofisticadas de estudiantes universitarios. Ningún distractor debe ser ingenuo ni descartable a simple vista.\n"
+            "4. EXPLICACIÓN RIGUROSA: La explicación pedagógica debe justificar por qué la opción seleccionada es la verdadera y por qué las alternativas fallan.\n\n"
+            "Responde EXCLUSIVAMENTE con un arreglo JSON válido (sin código markdown ```json extra):\n"
+            "[\n"
+            "  {\n"
+            '    "id": 1,\n'
+            '    "pregunta": "¿Pregunta analítica profunda de nivel universitario?",\n'
+            '    "opciones": ["Opción correcta", "Distractor plausible 1", "Distractor plausible 2", "Distractor plausible 3"],\n'
+            '    "indice_correcto": 0,\n'
+            '    "explicacion": "Demostración y justificación pedagógica completa..."\n'
             "  }\n"
             "]"
         )
@@ -497,7 +539,7 @@ def _generar_local_heuristico(req: GenerarRecursoRequest) -> Any:
         or (req.dificultad and "opción 2" in req.dificultad.lower())
     )
 
-    if tipo == "examen":
+    if tipo in ("examen", "psicopata", "psicopata_challenge"):
         return examen_matematicas_demo if is_math_oriented else examen_general_demo
     if tipo == "flashcards":
         return flashcards_demo
@@ -570,7 +612,7 @@ def _mezclar_opciones_examen(contenido: Any, tipo_recurso: str) -> Any:
             resultado.append(p_copia)
         return resultado
 
-    if tipo == "examen" and isinstance(contenido, list):
+    if tipo in ("examen", "psicopata", "psicopata_challenge") and isinstance(contenido, list):
         return _barajar_lista_preguntas(contenido)
     elif isinstance(contenido, dict):
         contenido_copia = dict(contenido)

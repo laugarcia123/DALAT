@@ -55,6 +55,7 @@ def resolver_calculadora_rapida(data: CalculadoraRequest):
 # Rutas de Asignaturas
 # ====================================================
 
+@router.get("", response_model=List[AsignaturaDetailResponse])
 @router.get("/", response_model=List[AsignaturaDetailResponse])
 def listar_asignaturas_usuario(
     current_user: Usuario = Depends(get_current_user),
@@ -80,6 +81,7 @@ def listar_asignaturas_usuario(
     return responses
 
 
+@router.post("", response_model=AsignaturaResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=AsignaturaResponse, status_code=status.HTTP_201_CREATED)
 def crear_nueva_asignatura(
     subject_in: AsignaturaCreate,

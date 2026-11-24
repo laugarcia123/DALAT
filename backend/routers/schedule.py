@@ -17,6 +17,7 @@ from crud.schedule import (
 router = APIRouter(prefix="/horarios", tags=["Horario & Calendario"])
 
 
+@router.get("", response_model=List[HorarioResponse])
 @router.get("/", response_model=List[HorarioResponse])
 def listar_horarios_usuario(
     dia_semana: Optional[int] = Query(None, ge=1, le=7, description="Filtrar por día (1=Lunes a 7=Domingo)"),
@@ -29,6 +30,7 @@ def listar_horarios_usuario(
     return get_user_schedule(db, user_id=current_user.id_usuario, dia_semana=dia_semana)
 
 
+@router.post("", response_model=HorarioResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=HorarioResponse, status_code=status.HTTP_201_CREATED)
 def agregar_bloque_horario(
     item_in: HorarioCreate,

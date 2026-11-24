@@ -155,7 +155,7 @@ interface MethodsTabProps {
   isPro?: boolean;
   onGoToCheckout?: () => void;
   tokensBalance?: number;
-  onDeductTokens?: (amount: number) => void;
+  onDeductTokens?: (amount: number) => Promise<number> | void;
   onSessionCompleted?: () => void;
 }
 

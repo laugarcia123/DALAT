@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from models.repository import EquipoEstudio, DocumentoRepositorio
+from models.repository import EquipoEstudio, DocumentoRepositorio, MiembroEquipo
 from schemas.repository import EquipoCreate, DocumentoCreate
 
 
@@ -10,8 +10,12 @@ def get_user_equipos(
     user_id: int,
     es_personal: Optional[bool] = None,
 ) -> List[EquipoEstudio]:
-    """Obtiene los equipos o espacios del repositorio del estudiante."""
-    query = db.query(EquipoEstudio).filter(EquipoEstudio.id_usuario == user_id)
+    """Obtiene los equipos o espacios del repositorio del estudiante (propios o donde es miembro)."""
+    subquery_miembro = db.query(MiembroEquipo.id_equipo).filter(MiembroEquipo.id_usuario == user_id)
+    query = db.query(EquipoEstudio).filter(
+        (EquipoEstudio.id_usuario == user_id) |
+        (EquipoEstudio.id_equipo.in_(subquery_miembro))
+    )
     if es_personal is not None:
         query = query.filter(EquipoEstudio.es_personal == es_personal)
     return query.order_by(EquipoEstudio.fecha_creacion.asc()).all()
@@ -22,12 +26,16 @@ def get_equipo_by_id(
     equipo_id: int,
     user_id: int,
 ) -> Optional[EquipoEstudio]:
-    """Obtiene un equipo verificando pertenencia."""
+    """Obtiene un equipo verificando pertenencia como creador o miembro."""
+    subquery_miembro = db.query(MiembroEquipo.id_equipo).filter(
+        MiembroEquipo.id_equipo == equipo_id,
+        MiembroEquipo.id_usuario == user_id,
+    )
     return (
         db.query(EquipoEstudio)
         .filter(
             EquipoEstudio.id_equipo == equipo_id,
-            EquipoEstudio.id_usuario == user_id,
+            (EquipoEstudio.id_usuario == user_id) | (EquipoEstudio.id_equipo.in_(subquery_miembro)),
         )
         .first()
     )
@@ -64,6 +72,16 @@ def create_equipo(
     db.add(db_equipo)
     db.commit()
     db.refresh(db_equipo)
+
+    # Registrar al creador en la tabla de miembros
+    creador_miembro = MiembroEquipo(
+        id_equipo=db_equipo.id_equipo,
+        id_usuario=user_id,
+        rol="creador",
+    )
+    db.add(creador_miembro)
+    db.commit()
+
     return db_equipo
 
 
@@ -76,15 +94,12 @@ def delete_equipo(db: Session, db_equipo: EquipoEstudio) -> None:
 def get_equipo_documentos(
     db: Session,
     equipo_id: int,
-    user_id: int,
+    user_id: Optional[int] = None,
 ) -> List[DocumentoRepositorio]:
-    """Lista todos los documentos de un equipo."""
+    """Lista todos los documentos compartidos de un equipo."""
     return (
         db.query(DocumentoRepositorio)
-        .filter(
-            DocumentoRepositorio.id_equipo == equipo_id,
-            DocumentoRepositorio.id_usuario == user_id,
-        )
+        .filter(DocumentoRepositorio.id_equipo == equipo_id)
         .order_by(DocumentoRepositorio.fecha_creacion.desc())
         .all()
     )

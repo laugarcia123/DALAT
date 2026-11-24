@@ -4,8 +4,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from db.database import get_db
 from models.user import Usuario
-from models.repository import EquipoEstudio, DocumentoRepositorio
-from core.deps import get_current_user
+from models.repository import EquipoEstudio, DocumentoRepositorio, MiembroEquipo
+from core.deps import get_current_user, get_optional_user
 from schemas.repository import (
     EquipoCreate,
     EquipoResponse,
@@ -40,11 +40,20 @@ def listar_equipos_estudio(
     """
     equipos = get_user_equipos(db, user_id=current_user.id_usuario, es_personal=es_personal)
 
-    # Añadir conteo y documentos a la respuesta
+    # Añadir conteo real de miembros y documentos a la respuesta
     resultado = []
     for eq in equipos:
         docs = get_equipo_documentos(db, equipo_id=eq.id_equipo, user_id=current_user.id_usuario)
+        
+        # Sincronizar número real de miembros desde MiembroEquipo
+        real_count = db.query(MiembroEquipo).filter(MiembroEquipo.id_equipo == eq.id_equipo).count()
+        members_count = max(real_count, 1)
+        if eq.miembros_count != members_count:
+            eq.miembros_count = members_count
+            db.commit()
+
         resp = EquipoResponse.model_validate(eq)
+        resp.miembros_count = members_count
         resp.documentos_count = len(docs)
         resp.documentos = [DocumentoResponse.model_validate(d) for d in docs]
         resultado.append(resp)
@@ -83,6 +92,54 @@ def eliminar_equipo_estudio(
     return {"message": "Equipo eliminado exitosamente", "id_equipo": id_equipo}
 
 
+@router.get("/equipos/preview/{codigo_invitacion}", response_model=EquipoResponse)
+def previsualizar_equipo_invitacion(
+    codigo_invitacion: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[Usuario] = Depends(get_optional_user),
+):
+    """
+    Permite previsualizar los detalles públicos de un repositorio a partir de su código
+    de invitación antes de unirse (accesible sin autenticación previa).
+    Detecta si el usuario ya es creador o miembro del equipo.
+    """
+    clean_code = codigo_invitacion.strip().lower()
+    equipo = db.query(EquipoEstudio).filter(
+        (EquipoEstudio.codigo_invitacion.ilike(clean_code)) |
+        (EquipoEstudio.codigo_invitacion.ilike(f"dalat-{clean_code}"))
+    ).first()
+
+    if not equipo and clean_code.isdigit():
+        equipo = db.query(EquipoEstudio).filter(EquipoEstudio.id_equipo == int(clean_code)).first()
+
+    if not equipo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró un repositorio con ese código de invitación.",
+        )
+
+    docs = get_equipo_documentos(db, equipo_id=equipo.id_equipo, user_id=equipo.id_usuario)
+    resp = EquipoResponse.model_validate(equipo)
+    resp.documentos_count = len(docs)
+    resp.documentos = [DocumentoResponse.model_validate(d) for d in docs]
+
+    if current_user:
+        if equipo.id_usuario == current_user.id_usuario:
+            resp.es_creador = True
+            resp.es_miembro = True
+            resp.rol_usuario = "creador"
+        else:
+            miembro = db.query(MiembroEquipo).filter(
+                MiembroEquipo.id_equipo == equipo.id_equipo,
+                MiembroEquipo.id_usuario == current_user.id_usuario
+            ).first()
+            if miembro:
+                resp.es_miembro = True
+                resp.rol_usuario = miembro.rol or "miembro"
+
+    return resp
+
+
 @router.post("/equipos/{codigo_invitacion}/unirse", response_model=EquipoResponse)
 def unirse_a_equipo_estudio(
     codigo_invitacion: str,
@@ -108,12 +165,24 @@ def unirse_a_equipo_estudio(
             detail="No se encontró un repositorio con ese código de invitación.",
         )
 
-    # Incrementar el número de miembros del equipo
-    equipo.miembros_count = (equipo.miembros_count or 1) + 1
-    db.commit()
-    db.refresh(equipo)
+    # Registrar membresía en equipo_miembros si no es creador ni miembro existente
+    existing_member = db.query(MiembroEquipo).filter(
+        MiembroEquipo.id_equipo == equipo.id_equipo,
+        MiembroEquipo.id_usuario == current_user.id_usuario,
+    ).first()
 
-    docs = get_equipo_documentos(db, equipo_id=equipo.id_equipo, user_id=equipo.id_usuario)
+    if not existing_member and equipo.id_usuario != current_user.id_usuario:
+        nuevo_miembro = MiembroEquipo(
+            id_equipo=equipo.id_equipo,
+            id_usuario=current_user.id_usuario,
+            rol="miembro",
+        )
+        db.add(nuevo_miembro)
+        equipo.miembros_count = (equipo.miembros_count or 1) + 1
+        db.commit()
+        db.refresh(equipo)
+
+    docs = get_equipo_documentos(db, equipo_id=equipo.id_equipo, user_id=current_user.id_usuario)
     resp = EquipoResponse.model_validate(equipo)
     resp.documentos_count = len(docs)
     resp.documentos = [DocumentoResponse.model_validate(d) for d in docs]
@@ -266,7 +335,7 @@ async def subir_documento_r2(
         formato=final_formato,
         tamano=tamano_texto,
         url_recurso=download_url,
-        autor_nombre=current_user.nombre_completo or "Tú"
+        autor_nombre=current_user.nombre or "Tú"
     )
 
     return create_documento(db, doc_in=doc_in, user_id=current_user.id_usuario)

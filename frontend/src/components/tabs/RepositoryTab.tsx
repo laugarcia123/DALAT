@@ -306,6 +306,26 @@ export default function RepositoryTab({
     });
   }, [loadRepository, loadQuota]);
 
+  // Procesar unión automática si viene de un enlace de invitación /?join_repo=... o dalat_pending_invite
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const pending = localStorage.getItem("dalat_pending_invite");
+      const urlParams = new URLSearchParams(window.location.search);
+      const joinCode = urlParams.get("join_repo") || pending;
+      if (joinCode) {
+        try {
+          localStorage.removeItem("dalat_pending_invite");
+          const url = new URL(window.location.href);
+          url.searchParams.delete("join_repo");
+          window.history.replaceState({}, "", url.pathname + (url.search || ""));
+        } catch {}
+        setTimeout(() => {
+          handleJoinBySlug(joinCode);
+        }, 350);
+      }
+    }
+  }, []);
+
   // Filtrar equipos según tab (Equipos vs Personal)
   const filteredEquipos = equipos.filter((e) =>
     activeTabFilter === "personal" ? e.es_personal : !e.es_personal
@@ -329,12 +349,11 @@ export default function RepositoryTab({
     const inviteUrl = `${baseUrl}/invite/${inviteCode}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedEquipoId(equipo.id_equipo);
-    confetti({ particleCount: 25, spread: 45, origin: { y: 0.8 } });
     setTimeout(() => setCopiedEquipoId(null), 2500);
   };
 
   // Helper para procesar unión por código o URL
-  const handleJoinBySlug = (raw: string) => {
+  const handleJoinBySlug = async (raw: string) => {
     if (!raw.trim()) return;
     let slug = raw.trim();
     if (slug.includes("/invite/")) {
@@ -342,7 +361,42 @@ export default function RepositoryTab({
     }
     slug = slug.replace(/[?#].*$/, "");
 
-    // 1. Verificar si ya está en la lista actual
+    // Asegurar que estamos en la pestaña de equipos compartidos
+    setActiveTabFilter("equipos");
+
+    // 1. Si está autenticado, registrar y cargar el equipo real desde el backend PostgreSQL
+    if (isAuthenticated) {
+      try {
+        const joinedBackend = await repositoryService.unirseEquipo(slug);
+        if (joinedBackend && joinedBackend.id_equipo) {
+          setEquipos((prev) => {
+            const idx = prev.findIndex(
+              (e) =>
+                e.id_equipo === joinedBackend.id_equipo ||
+                e.codigo_invitacion?.toLowerCase() === slug.toLowerCase()
+            );
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = { ...copy[idx], ...joinedBackend };
+              return copy;
+            }
+            return [joinedBackend, ...prev];
+          });
+          setInviteFeedback({
+            type: "success",
+            message: `¡Te has unido exitosamente al repositorio "${joinedBackend.nombre}"!`,
+          });
+          setInviteInputCode("");
+          setViewingEquipoId(joinedBackend.id_equipo);
+          setTimeout(() => setInviteFeedback(null), 4500);
+          return;
+        }
+      } catch (err) {
+        console.warn("Aviso uniendo equipo en backend:", err);
+      }
+    }
+
+    // 2. Verificar si ya está en la lista actual
     const existing = equipos.find(
       (eq) =>
         eq.codigo_invitacion?.toLowerCase() === slug.toLowerCase() ||
@@ -356,12 +410,11 @@ export default function RepositoryTab({
       });
       setInviteInputCode("");
       setViewingEquipoId(existing.id_equipo);
-      confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
       setTimeout(() => setInviteFeedback(null), 4000);
       return;
     }
 
-    // 2. Verificar catálogo de repositorios predefinidos
+    // 3. Verificar catálogo de repositorios predefinidos
     const preset = PRESET_INVITE_REPOSITORIES[slug.toLowerCase()];
     if (preset) {
       const newRepo: EquipoItem = {
@@ -375,12 +428,11 @@ export default function RepositoryTab({
       });
       setInviteInputCode("");
       setViewingEquipoId(newRepo.id_equipo);
-      confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
       setTimeout(() => setInviteFeedback(null), 4500);
       return;
     }
 
-    // 3. Crear repositorio dinámico a partir del código si no existe
+    // 4. Crear repositorio dinámico a partir del código si no existe
     const cleanName = slug
       .replace(/^dalat-/, "")
       .replace(/-/g, " ")
@@ -395,19 +447,9 @@ export default function RepositoryTab({
       color: "#7c5dfa",
       es_personal: false,
       codigo_invitacion: slug,
-      miembros_count: 4,
-      documentos_count: 1,
-      documentos: [
-        {
-          id_documento: Date.now() + 1,
-          id_usuario: 1,
-          nombre: `Guía de bienvenida — ${cleanName}.pdf`,
-          formato: "PDF",
-          tamano: "1.2 MB",
-          autor_nombre: "Equipo Dalat",
-          fecha_creacion: new Date().toISOString().split("T")[0],
-        },
-      ],
+      miembros_count: 2,
+      documentos_count: 0,
+      documentos: [],
     };
 
     setEquipos((prev) => [generatedRepo, ...prev]);
@@ -417,7 +459,6 @@ export default function RepositoryTab({
     });
     setInviteInputCode("");
     setViewingEquipoId(generatedRepo.id_equipo);
-    confetti({ particleCount: 50, spread: 65, origin: { y: 0.6 } });
     setTimeout(() => setInviteFeedback(null), 4500);
   };
 
@@ -690,7 +731,7 @@ export default function RepositoryTab({
   const handleOpenDoc = (doc: DocumentoItem) => {
     if (doc.url_recurso) {
       let finalUrl = doc.url_recurso.trim();
-      if (!/^https?:\/\//i.test(finalUrl)) {
+      if (!/^https?:\/\//i.test(finalUrl) && !finalUrl.startsWith("/")) {
         finalUrl = `https://${finalUrl}`;
       }
       window.open(finalUrl, "_blank", "noopener,noreferrer");
@@ -755,12 +796,12 @@ export default function RepositoryTab({
                     </div>
                     <span className="truncate">Almacenamiento</span>
                   </span>
-                  <div className="flex items-baseline gap-1 font-mono text-xs shrink-0">
-                    <span className="font-bold text-purple-600 dark:text-purple-400">
+                  <div className="flex items-baseline gap-1 text-xs shrink-0">
+                    <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
                       {quotaInfo ? quotaInfo.usado_mb : "0"} MB
                     </span>
-                    <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                      / {quotaInfo ? quotaInfo.limite_texto : (isPro ? "2 GB" : "70 MB")}
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      usados de <span className="font-semibold text-slate-700 dark:text-slate-200">{quotaInfo ? quotaInfo.limite_texto : (isPro ? "2 GB" : "70 MB")}</span>
                     </span>
                   </div>
                 </div>
@@ -781,7 +822,7 @@ export default function RepositoryTab({
                 <div className="flex items-center justify-between gap-2 text-[10px]">
                   <span className="font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
-                    <span>{isPro ? "Plan PRO (2 GB)" : "Plan Básico (70 MB)"}</span>
+                    <span>{isPro ? "Plan PRO (2 GB disponibles)" : "Plan Básico (70 MB disponibles)"}</span>
                   </span>
                   {!isPro && onGoToCheckout && (
                     <button
@@ -1134,38 +1175,40 @@ export default function RepositoryTab({
               );
             }))}
 
-            {/* Cuadro para Crear Nuevo Repositorio */}
-            <div
-              onClick={() => {
-                setEquipoEsPersonal(activeTabFilter === "personal");
-                setIsEquipoModalOpen(true);
-              }}
-              className={`rounded-2xl border-2 border-dashed p-6 flex flex-col items-center justify-center text-center gap-3 transition-all cursor-pointer min-h-[220px] ${
-                activeLight
-                  ? "border-slate-300 bg-slate-50/50 hover:bg-indigo-50/40 hover:border-indigo-400 text-slate-600"
-                  : "border-[#202742] bg-[#0c0e18]/40 hover:bg-[#11152a] hover:border-indigo-500/50 text-slate-300"
-              }`}
-            >
+            {/* Cuadro para Crear Nuevo Repositorio (solo si ya existen repositorios creados) */}
+            {filteredEquipos.length > 0 && (
               <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform hover:scale-110 ${
+                onClick={() => {
+                  setEquipoEsPersonal(activeTabFilter === "personal");
+                  setIsEquipoModalOpen(true);
+                }}
+                className={`rounded-2xl border-2 border-dashed p-6 flex flex-col items-center justify-center text-center gap-3 transition-all cursor-pointer min-h-[220px] ${
                   activeLight
-                    ? "bg-indigo-100 text-indigo-600"
-                    : "bg-indigo-500/20 text-indigo-400"
+                    ? "border-slate-300 bg-slate-50/50 hover:bg-indigo-50/40 hover:border-indigo-400 text-slate-600"
+                    : "border-[#202742] bg-[#0c0e18]/40 hover:bg-[#11152a] hover:border-indigo-500/50 text-slate-300"
                 }`}
               >
-                <Plus className="w-6 h-6" />
-              </div>
-              <div>
-                <h4
-                  className={`text-sm font-bold ${activeLight ? "text-slate-800" : "text-white"}`}
+                <div
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform hover:scale-110 ${
+                    activeLight
+                      ? "bg-indigo-100 text-indigo-600"
+                      : "bg-indigo-500/20 text-indigo-400"
+                  }`}
                 >
-                  {activeTabFilter === "personal" ? "Nuevo espacio personal" : "Crear nuevo equipo"}
-                </h4>
-                <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
-                  Crea un repositorio para compartir apuntes o almacenar tus guías
-                </p>
+                  <Plus className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4
+                    className={`text-sm font-bold ${activeLight ? "text-slate-800" : "text-white"}`}
+                  >
+                    {activeTabFilter === "personal" ? "Nuevo espacio personal" : "Crear nuevo equipo"}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
+                    Crea un repositorio para compartir apuntes o almacenar tus guías
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       ) : (
@@ -1399,26 +1442,31 @@ export default function RepositoryTab({
                     </div>
 
                     {/* Botón Descargar / Abrir: ¡CLARO EN MODO CLARO, NADA DE BOTONES NEGROS! */}
-                    <button
-                      onClick={() => handleOpenDoc(doc)}
-                      className={`w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.99] cursor-pointer ${
-                        activeLight
-                          ? "bg-slate-50 hover:bg-indigo-50 border border-slate-200/90 text-indigo-600 hover:text-indigo-700 shadow-sm"
-                          : "bg-[#13172c] hover:bg-[#1c223f] border border-[#202747] text-indigo-300 hover:text-white"
-                      }`}
-                    >
-                      {doc.url_recurso ? (
-                        <>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Abrir enlace / recurso</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Descargar material</span>
-                        </>
-                      )}
-                    </button>
+                    {doc.formato === "LINK" || doc.formato === "NOTION" || doc.tamano === "Enlace" ? (
+                      <button
+                        onClick={() => handleOpenDoc(doc)}
+                        className={`w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.99] cursor-pointer ${
+                          activeLight
+                            ? "bg-slate-50 hover:bg-emerald-50 border border-slate-200/90 text-emerald-600 hover:text-emerald-700 shadow-sm"
+                            : "bg-[#102421] hover:bg-[#173a34] border border-[#17443d] text-emerald-400 hover:text-white"
+                        }`}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Abrir enlace / recurso</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenDoc(doc)}
+                        className={`w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.99] cursor-pointer ${
+                          activeLight
+                            ? "bg-slate-50 hover:bg-indigo-50 border border-slate-200/90 text-indigo-600 hover:text-indigo-700 shadow-sm"
+                            : "bg-[#13172c] hover:bg-[#1c223f] border border-[#202747] text-indigo-300 hover:text-white"
+                        }`}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Descargar material</span>
+                      </button>
+                    )}
                   </div>
                 ))
               )}

@@ -20,7 +20,8 @@ interface PricingSectionProps {
 interface ComparisonRow {
   name: string;
   basic: string | boolean;
-  pro: string | boolean;
+  micro: string | boolean;
+  monthly: string | boolean;
   annual: string | boolean;
 }
 
@@ -31,106 +32,202 @@ interface ComparisonCategory {
 
 const COMPARISON_CATEGORIES: ComparisonCategory[] = [
   {
-    title: "Inteligencia Artificial Socrática & Parciales",
+    title: "Organización Académica & Tareas",
     rows: [
       {
-        name: "Generación de exámenes tipo parcial desde PDFs",
-        basic: "3 pruebas",
-        pro: "Ilimitado",
-        annual: "Ilimitado",
-      },
-      {
-        name: "Soporte para fórmulas científicas y KaTeX",
+        name: "Tablero de tareas Kanban ilimitado",
         basic: true,
-        pro: true,
+        micro: true,
+        monthly: true,
         annual: true,
       },
       {
-        name: "Cero alucinaciones: citado exacto a tus notas",
-        basic: false,
-        pro: true,
+        name: "Horario semanal interactivo de materias",
+        basic: true,
+        micro: true,
+        monthly: true,
         annual: true,
       },
       {
-        name: "Flashcards automáticas con Spaced Repetition",
-        basic: false,
-        pro: true,
+        name: "Priorización de tareas (Urgente, Exámenes, General)",
+        basic: true,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Seguimiento de racha diaria y meta semanal de estudio",
+        basic: true,
+        micro: true,
+        monthly: true,
         annual: true,
       },
     ],
   },
   {
-    title: "Seguimiento de Cortes & GPA Predictivo",
+    title: "Control de Calificaciones & GPA Predictivo",
     rows: [
       {
-        name: "Cálculo inverso de nota meta para Corte 3",
-        basic: false,
-        pro: true,
+        name: "Registro y ponderación de notas por corte",
+        basic: true,
+        micro: true,
+        monthly: true,
         annual: true,
       },
       {
-        name: "Ponderación de créditos y syllabus universitario",
-        basic: "Básica",
-        pro: "Avanzada",
-        annual: "Avanzada",
+        name: "Cálculo automático de promedio acumulado del semestre",
+        basic: true,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Simulador y calculadora rápida de notas ponderadas (%)",
+        basic: true,
+        micro: true,
+        monthly: true,
+        annual: true,
       },
       {
         name: "Materias y asignaturas activas",
-        basic: "Hasta 3",
-        pro: "Ilimitadas",
+        basic: "Hasta 6",
+        micro: "Ilimitadas",
+        monthly: "Ilimitadas",
         annual: "Ilimitadas",
-      },
-      {
-        name: "Alertas tempranas de riesgo de reprobación",
-        basic: false,
-        pro: true,
-        annual: true,
       },
     ],
   },
   {
-    title: "Modo Zen & Concentración",
+    title: "Métodos de Estudio & Concentración",
     rows: [
       {
-        name: "Temporizador Pomodoro adaptativo a fatiga",
+        name: "Temporizador Pomodoro interactivo y adaptativo",
         basic: true,
-        pro: true,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Método Cornell (plantillas estructuradas descargables)",
+        basic: true,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Repetición Espaciada guiada (bloques de retención)",
+        basic: true,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Técnica de Recuerdo Activo (Active Recall)",
+        basic: true,
+        micro: true,
+        monthly: true,
         annual: true,
       },
       {
         name: "Ondas binaurales calibradas (Alpha 10Hz & Theta 6Hz)",
-        basic: "1 pista",
-        pro: "Biblioteca completa",
+        basic: "Biblioteca completa",
+        micro: "Biblioteca completa",
+        monthly: "Biblioteca completa",
         annual: "Biblioteca completa",
+      },
+      {
+        name: "Método Feynman integrado con IA",
+        basic: false,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Acceso al Método Psicópata (Modo Muerte Súbita)",
+        basic: false,
+        micro: true,
+        monthly: true,
+        annual: true,
       },
       {
         name: "Bóvedas compartidas para grupos de estudio",
         basic: false,
-        pro: "Hasta 3 bóvedas",
-        annual: "Ilimitadas",
+        micro: true,
+        monthly: true,
+        annual: true,
       },
     ],
   },
   {
-    title: "Condiciones y Medios de Pago",
+    title: "Recursos Integrados con IA",
     rows: [
       {
-        name: "Sin renovación forzada (vence solo)",
-        basic: true,
-        pro: "En Pases Micro",
-        annual: "Cancela en 1 clic",
-      },
-      {
-        name: "Medios de pago colombianos (PSE, Nequi, Daviplata)",
-        basic: "—",
-        pro: true,
+        name: "Generación de exámenes",
+        basic: false,
+        micro: true,
+        monthly: true,
         annual: true,
       },
       {
-        name: "Descuento por anticipo",
+        name: "Creación de resúmenes",
         basic: false,
-        pro: false,
-        annual: "28% de Ahorro",
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Generación de flashcards",
+        basic: false,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Creación de guía paso a paso",
+        basic: false,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Exportación de guías y resúmenes a PDF",
+        basic: false,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Créditos de IA para recursos",
+        basic: false,
+        micro: "Desde 40",
+        monthly: "150 / mes",
+        annual: "150 / mes",
+      },
+    ],
+  },
+  {
+    title: "Almacenamiento & Beneficios Flexibles",
+    rows: [
+      {
+        name: "Repositorio de archivos y apuntes por materia",
+        basic: true,
+        micro: true,
+        monthly: true,
+        annual: true,
+      },
+      {
+        name: "Capacidad de almacenamiento en Repositorio",
+        basic: "70 MB",
+        micro: "Desde 300 a 600 MB",
+        monthly: "2 GB",
+        annual: "5 GB",
+      },
+      {
+        name: "Habilitación de Packs de Ahorro",
+        basic: false,
+        micro: false,
+        monthly: true,
+        annual: true,
       },
     ],
   },
@@ -321,9 +418,9 @@ export default function PricingSection({
               features={[
                 "Tablero de tareas Kanban ilimitado",
                 "Horario dinámico de materias",
-                "Temporizador Pomodoro y método Feynman",
-                "Hasta 3 materias activas simultáneas",
-                "3 simulacros de examen con IA",
+                "Técnicas Pomodoro, Cornell y Active Recall",
+                "Hasta 6 materias activas simultáneas",
+                "70 MB de almacenamiento en repositorios",
               ]}
               buttonText="Comenzar gratis"
               onAction={onEnterApp}
@@ -333,8 +430,8 @@ export default function PricingSection({
             <PricingCard
               title="Pase Sprint"
               desc="Ideal para salvar la semana de parciales y exámenes intensivos sin ataduras."
-              strikethroughPrice="$14.900"
-              price="$8.900"
+              strikethroughPrice="$16.900"
+              price="$11.900"
               period="COP / pago único (7 días)"
               subnote="Sin renovación forzada: vence automáticamente"
               features={[
@@ -342,13 +439,13 @@ export default function PricingSection({
                 "40 créditos de IA para exámenes, flashcards y resúmenes",
                 "Opción 1 y Opción 2 de optimización pedagógica",
                 "Acceso completo al Método Psicópata (Muerte Súbita)",
-                "Cero alucinaciones con cita directa de tus notas",
+                "300 MB de almacenamiento en repositorios",
               ]}
               buttonText="Elegir Pase 1 Semana"
               onAction={() =>
                 onChoosePlan({
                   name: "Pase Sprint • 1 Semana",
-                  price: "$8.900",
+                  price: "$11.900",
                   period: "COP / 7 días (Pago único)",
                   badge: "Semana de Parciales",
                   features: [
@@ -356,7 +453,7 @@ export default function PricingSection({
                     "40 créditos de IA para exámenes, flashcards y resúmenes",
                     "Opción 1 y Opción 2 de optimización pedagógica",
                     "Acceso completo al Método Psicópata (Muerte Súbita)",
-                    "Sin renovación forzada: vence automáticamente",
+                    "300 MB de almacenamiento en repositorios",
                   ],
                 })
               }
@@ -376,7 +473,7 @@ export default function PricingSection({
                 "80 créditos de IA para exámenes, flashcards y guías",
                 "Opción 1 y Opción 2 de optimización pedagógica",
                 "Acceso total al Método Psicópata (Muerte Súbita)",
-                "2 GB de almacenamiento en tus repositorios",
+                "600 MB de almacenamiento en tus repositorios",
               ]}
               buttonText="Elegir Pase 2 Semanas"
               onAction={() =>
@@ -390,7 +487,7 @@ export default function PricingSection({
                     "80 créditos de IA para exámenes, flashcards y guías",
                     "Opción 1 y Opción 2 de optimización pedagógica",
                     "Acceso total al Método Psicópata (Muerte Súbita)",
-                    "2 GB de almacenamiento en tus repositorios",
+                    "600 MB de almacenamiento en tus repositorios",
                   ],
                 })
               }
@@ -411,9 +508,9 @@ export default function PricingSection({
               features={[
                 "Tablero de tareas Kanban ilimitado",
                 "Horario dinámico de materias",
-                "Temporizador Pomodoro y método Feynman",
-                "Hasta 3 materias activas simultáneas",
-                "Acceso a repositorios básicos",
+                "Técnicas Pomodoro, Cornell y Active Recall",
+                "Hasta 6 materias activas simultáneas",
+                "70 MB de almacenamiento en repositorios",
               ]}
               buttonText="Tu Plan Actual"
               onAction={onEnterApp}
@@ -523,26 +620,32 @@ export default function PricingSection({
           className="relative z-20 overflow-x-auto rounded-2xl border border-white/[0.12] shadow-2xl -mx-2 sm:mx-0"
           style={{ backgroundColor: "#0c0f22" }}
         >
-          <table className="w-full text-left border-collapse min-w-[620px]" style={{ backgroundColor: "#0c0f22" }}>
-            {/* Table Header */}
+          <table className="w-full text-left border-collapse min-w-[760px]" style={{ backgroundColor: "#0c0f22" }}>
+            {/* Table Header: 5 distinct columns */}
             <thead>
               <tr className="border-b border-white/[0.1] bg-[#111630]" style={{ backgroundColor: "#111630" }}>
-                <th className="py-5 px-6 text-xs font-mono uppercase tracking-wider text-zinc-400 w-2/5">
+                <th className="py-5 px-6 text-xs font-mono uppercase tracking-wider text-zinc-400 w-[28%]">
                   Módulos y Capacidades
                 </th>
-                <th className="py-5 px-4 text-center w-1/5">
+                <th className="py-5 px-3 text-center w-[18%]">
                   <span className="text-xs font-mono uppercase tracking-wider text-zinc-400 block font-bold">
                     Básico
                   </span>
                   <span className="text-sm font-bold text-white block mt-0.5">$0 COP</span>
                 </th>
-                <th className="py-5 px-4 text-center w-1/5 bg-[#171438] border-x border-purple-500/25" style={{ backgroundColor: "#171438" }}>
-                  <span className="text-xs font-mono uppercase tracking-wider text-purple-400 block font-bold">
-                    Pro (Micro / Mensual)
+                <th className="py-5 px-3 text-center w-[18%] bg-[#15122e] border-l border-purple-500/20" style={{ backgroundColor: "#15122e" }}>
+                  <span className="text-xs font-mono uppercase tracking-wider text-purple-300 block font-bold">
+                    Pases Micro
                   </span>
-                  <span className="text-sm font-bold text-white block mt-0.5">Desde $8.900</span>
+                  <span className="text-sm font-bold text-white block mt-0.5">Desde $11.900</span>
                 </th>
-                <th className="py-5 px-4 text-center w-1/5">
+                <th className="py-5 px-3 text-center w-[18%] bg-[#1a143a] border-x border-purple-500/30" style={{ backgroundColor: "#1a143a" }}>
+                  <span className="text-xs font-mono uppercase tracking-wider text-purple-400 block font-bold">
+                    Pro Mensual
+                  </span>
+                  <span className="text-sm font-bold text-white block mt-0.5">$19.900 / mes</span>
+                </th>
+                <th className="py-5 px-3 text-center w-[18%]">
                   <span className="text-xs font-mono uppercase tracking-wider text-emerald-400 block font-bold">
                     Pro Anual
                   </span>
@@ -556,7 +659,7 @@ export default function PricingSection({
                 <React.Fragment key={catIdx}>
                   <tr className="bg-[#141938]" style={{ backgroundColor: "#141938" }}>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="py-3 px-6 text-[11px] font-mono uppercase tracking-widest text-indigo-300 font-bold bg-[#141938]"
                     >
                       {cat.title}
@@ -573,7 +676,7 @@ export default function PricingSection({
                       </td>
 
                       {/* Col 1: Básico */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-3 text-center">
                         {typeof row.basic === "boolean" ? (
                           row.basic ? (
                             <CheckCircle2 className="w-4 h-4 mx-auto text-emerald-400" />
@@ -581,37 +684,44 @@ export default function PricingSection({
                             <Minus className="w-4 h-4 mx-auto text-zinc-600" />
                           )
                         ) : (
-                          <span className={row.basic === "Básica" ? "text-zinc-300" : "text-zinc-400"}>
+                          <span className={row.basic === "Biblioteca completa" ? "text-emerald-400 font-semibold" : "text-zinc-300"}>
                             {row.basic}
                           </span>
                         )}
                       </td>
 
-                      {/* Col 2: Pro */}
-                      <td className="py-3.5 px-4 text-center bg-[#151330] border-x border-purple-500/25" style={{ backgroundColor: "#151330" }}>
-                        {typeof row.pro === "boolean" ? (
-                          row.pro ? (
+                      {/* Col 2: Pases Micro */}
+                      <td className="py-3.5 px-3 text-center bg-[#131028] border-l border-purple-500/20" style={{ backgroundColor: "#131028" }}>
+                        {typeof row.micro === "boolean" ? (
+                          row.micro ? (
                             <CheckCircle2 className="w-4 h-4 mx-auto text-emerald-400" />
                           ) : (
                             <Minus className="w-4 h-4 mx-auto text-zinc-600" />
                           )
                         ) : (
-                          <span
-                            className={
-                              row.pro === "Ilimitado" || row.pro === "Ilimitadas" || row.pro === "Biblioteca completa"
-                                ? "text-emerald-400 font-bold"
-                                : row.pro === "En Pases Micro"
-                                ? "text-emerald-400 font-medium"
-                                : "text-emerald-400 font-semibold"
-                            }
-                          >
-                            {row.pro}
+                          <span className="text-emerald-400 font-semibold">
+                            {row.micro}
                           </span>
                         )}
                       </td>
 
-                      {/* Col 3: Pro Anual */}
-                      <td className="py-3.5 px-4 text-center">
+                      {/* Col 3: Pro Mensual */}
+                      <td className="py-3.5 px-3 text-center bg-[#161233] border-x border-purple-500/30" style={{ backgroundColor: "#161233" }}>
+                        {typeof row.monthly === "boolean" ? (
+                          row.monthly ? (
+                            <CheckCircle2 className="w-4 h-4 mx-auto text-emerald-400" />
+                          ) : (
+                            <Minus className="w-4 h-4 mx-auto text-zinc-600" />
+                          )
+                        ) : (
+                          <span className="text-emerald-400 font-semibold">
+                            {row.monthly}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Col 4: Pro Anual */}
+                      <td className="py-3.5 px-3 text-center">
                         {typeof row.annual === "boolean" ? (
                           row.annual ? (
                             <CheckCircle2 className="w-4 h-4 mx-auto text-emerald-400" />
@@ -619,18 +729,7 @@ export default function PricingSection({
                             <Minus className="w-4 h-4 mx-auto text-zinc-600" />
                           )
                         ) : (
-                          <span
-                            className={
-                              row.annual === "Ilimitado" ||
-                              row.annual === "Ilimitadas" ||
-                              row.annual === "Biblioteca completa" ||
-                              row.annual === "28% de Ahorro"
-                                ? "text-emerald-400 font-bold"
-                                : row.annual === "Avanzada"
-                                ? "text-emerald-400 font-semibold"
-                                : "text-zinc-300"
-                            }
-                          >
+                          <span className="text-emerald-400 font-bold">
                             {row.annual}
                           </span>
                         )}

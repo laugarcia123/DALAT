@@ -10,6 +10,8 @@ export interface UserBackend {
   biografia?: string | null;
   avatar_color?: string | null;
   tokens_disponibles?: number;
+  record_psicopata?: number;
+  victorias_psicopata?: number;
   tipo_plan: "basico" | "pro" | "institucional" | "micro";
   es_institucional: boolean;
   is_active: boolean;
@@ -140,6 +142,29 @@ export const authService = {
       body: JSON.stringify({ amount }),
       requiresAuth: true,
     });
+  },
+
+  /**
+   * Persistir récord y victorias del Método Psicópata en la base de datos
+   */
+  async updatePsicopataRecord(streak: number, esVictoria: boolean): Promise<UserBackend> {
+    return apiFetch<UserBackend>("/users/psicopata-record", {
+      method: "POST",
+      body: JSON.stringify({ streak, es_victoria: esVictoria }),
+      requiresAuth: true,
+    });
+  },
+
+  /**
+   * Eliminar permanentemente la cuenta del usuario en PostgreSQL
+   */
+  async deleteAccount(): Promise<{ status: string; message: string }> {
+    const res = await apiFetch<{ status: string; message: string }>("/users/me", {
+      method: "DELETE",
+      requiresAuth: true,
+    });
+    this.logout();
+    return res;
   },
 
   /**

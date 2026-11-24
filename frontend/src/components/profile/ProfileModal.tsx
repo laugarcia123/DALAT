@@ -8,6 +8,10 @@ import {
   CheckCircle2,
   Check,
   Target,
+  Trash2,
+  AlertTriangle,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
@@ -32,6 +36,7 @@ interface ProfileModalProps {
   onClose: () => void;
   profile: UserProfile;
   onSave: (updated: UserProfile) => void;
+  onDeleteAccount?: () => Promise<void> | void;
   isLightMode?: boolean;
 }
 
@@ -51,6 +56,7 @@ export default function ProfileModal({
   onClose,
   profile,
   onSave,
+  onDeleteAccount,
   isLightMode = false,
 }: ProfileModalProps) {
   // Sincronización reactiva con clase theme-light del DOM
@@ -80,6 +86,23 @@ export default function ProfileModal({
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!onDeleteAccount) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteAccount();
+      setShowDeleteConfirm(false);
+      onClose();
+    } catch (err) {
+      console.error("[ProfileModal] Error al eliminar cuenta:", err);
+      alert("Hubo un problema al intentar eliminar tu cuenta. Por favor intenta nuevamente.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     setFormData({
@@ -260,43 +283,129 @@ export default function ProfileModal({
             </div>
           </div>
 
-          {/* ACCIONES DEL FORMULARIO */}
+          {/* ACCIONES DEL FORMULARIO: BOTÓN ELIMINAR CUENTA + GUARDAR / CANCELAR */}
           <div
-            className={`flex items-center justify-end gap-3 pt-4 border-t ${
+            className={`flex items-center justify-between gap-3 pt-4 border-t ${
               activeLight ? "border-slate-100" : "border-[#19203b]"
             }`}
           >
-            <button
-              type="button"
-              onClick={onClose}
-              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
-                activeLight
-                  ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  : "text-slate-400 hover:text-white hover:bg-white/[0.08]"
-              }`}
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-600/30 transition flex items-center gap-2 cursor-pointer active:scale-95"
-            >
-              {savedSuccess ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                  <span>¡Cambios Guardados!</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>Guardar cambios</span>
-                </>
+            <div>
+              {onDeleteAccount && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold transition border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer active:scale-95 flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar cuenta</span>
+                </button>
               )}
-            </button>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
+                  activeLight
+                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.08]"
+                }`}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-600/30 transition flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                {savedSuccess ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                    <span>¡Cambios Guardados!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Guardar cambios</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN DE BORRADO DE CUENTA */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md rounded-3xl border shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150 ${
+              activeLight
+                ? "bg-white border-red-200 text-slate-900 shadow-xl"
+                : "bg-[#0f1120] border-red-500/30 text-white shadow-black"
+            }`}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6 text-red-500" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className={`text-lg font-bold ${activeLight ? "text-slate-900" : "text-white"}`}>
+                ¿Estás seguro de eliminar tu cuenta?
+              </h3>
+              <p className={`text-xs leading-relaxed ${activeLight ? "text-slate-600" : "text-slate-400"}`}>
+                Esta acción es <strong>definitiva e irreversible</strong>. Se eliminará permanentemente tu usuario, tus asignaturas, notas, tareas, horarios y los archivos que subiste.
+              </p>
+            </div>
+
+            <div
+              className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 ${
+                activeLight
+                  ? "bg-red-50 border-red-200 text-red-800"
+                  : "bg-red-500/10 border-red-500/20 text-red-300"
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4 shrink-0 text-red-500" />
+              <span>No podrás recuperar tu información ni tu progreso después de confirmar.</span>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteConfirm(false)}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
+                  activeLight
+                    ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    : "bg-white/10 text-slate-300 hover:bg-white/15"
+                }`}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Sí, eliminar cuenta</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

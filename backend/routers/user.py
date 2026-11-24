@@ -13,6 +13,7 @@ from crud.user import (
     create_user,
     update_user,
     authenticate_user,
+    delete_user_account,
 )
 from core.security import create_access_token
 from core.deps import get_current_user
@@ -144,6 +145,19 @@ def update_current_user_profile(
     return update_user(db, db_user=current_user, user_in=user_update)
 
 
+@router.delete("/me", status_code=status.HTTP_200_OK)
+def delete_current_user_account(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Elimina permanentemente la cuenta del usuario autenticado y todos sus datos relacionados
+    (tareas, materias, horarios, sesiones de estudio y archivos de repositorio).
+    """
+    delete_user_account(db, db_user=current_user)
+    return {"status": "ok", "message": "Cuenta eliminada permanentemente"}
+
+
 class UpgradePlanRequest(BaseModel):
     plan: str
     tokens: Optional[int] = None
@@ -179,6 +193,11 @@ class DeductTokensRequest(BaseModel):
     amount: int
 
 
+class PsicopataRecordRequest(BaseModel):
+    streak: int
+    es_victoria: bool = False
+
+
 @router.post("/deduct-tokens", response_model=UserResponse)
 def deduct_tokens_endpoint(
     payload: DeductTokensRequest,
@@ -188,6 +207,22 @@ def deduct_tokens_endpoint(
     """Descuenta tokens del saldo del usuario y los persiste en PostgreSQL."""
     cost = max(1, payload.amount)
     current_user.tokens_disponibles = max(0, (current_user.tokens_disponibles or 0) - cost)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/psicopata-record", response_model=UserResponse)
+def actualizar_record_psicopata(
+    payload: PsicopataRecordRequest,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Guarda y persiste el récord y victorias de Método Psicópata en la base de datos."""
+    if payload.streak > (current_user.record_psicopata or 0):
+        current_user.record_psicopata = payload.streak
+    if payload.es_victoria:
+        current_user.victorias_psicopata = (current_user.victorias_psicopata or 0) + 1
     db.commit()
     db.refresh(current_user)
     return current_user

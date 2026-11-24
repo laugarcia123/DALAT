@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Plus,
   X,
-  Calendar,
   Trash2,
   Calculator,
   Loader2,
@@ -212,9 +211,7 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
   // New evaluation form state
   const [evalName, setEvalName] = useState("");
   const [evalType, setEvalType] = useState<"Tarea" | "Examen" | "Taller" | "Proyecto">("Examen");
-  const [evalDate, setEvalDate] = useState("11/06/2026");
   const [evalGrade, setEvalGrade] = useState("8.5");
-  const [evalMaxGrade, setEvalMaxGrade] = useState("10");
   const [evalWeight, setEvalWeight] = useState("40");
 
   // Carga inicial y sincronización con el backend
@@ -297,7 +294,6 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
 
     setNewSubjectScale(newScale);
     setNewSubjectPassing(newScale === 5.0 ? 3.0 : 6.0);
-    setEvalMaxGrade(newScale.toString());
     setEvalGrade(newScale === 5.0 ? "4.2" : "8.5");
   };
 
@@ -398,18 +394,39 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
     try {
       let createdItem: SubjectItem;
 
-      if (getStoredToken()) {
-        const backendSubj = await subjectService.createSubject({
-          nombre: newSubjectName.trim(),
-          codigo: undefined,
-          profesor: undefined,
-          creditos: newSubjectCredits || 3,
-          color: newSubjectColor,
-          escala_maxima: newSubjectScale,
-          nota_aprobatoria: newSubjectPassing,
-          periodo: "2026-1",
-        });
-        createdItem = mapBackendSubjectToItem(backendSubj);
+      const token = getStoredToken();
+      if (token) {
+        try {
+          const backendSubj = await subjectService.createSubject({
+            nombre: newSubjectName.trim(),
+            codigo: undefined,
+            profesor: undefined,
+            creditos: newSubjectCredits || 3,
+            color: newSubjectColor,
+            escala_maxima: newSubjectScale,
+            nota_aprobatoria: newSubjectPassing,
+            periodo: "2026-1",
+          });
+          createdItem = mapBackendSubjectToItem(backendSubj);
+        } catch (backendErr: any) {
+          console.warn("[NotesTab] Error al guardar en backend, guardando localmente:", backendErr);
+          createdItem = {
+            id: `local_${Date.now()}`,
+            name: newSubjectName.trim(),
+            code: undefined,
+            professor: undefined,
+            credits: newSubjectCredits || 3,
+            color: newSubjectColor,
+            maxScale: newSubjectScale,
+            passingGrade: newSubjectPassing,
+            evaluationsText: "3 cortes · 0 evaluaciones",
+            cortes: [
+              { id: "c1", corteNum: 1, name: "1er Corte", weight: 30, evaluations: [] },
+              { id: "c2", corteNum: 2, name: "2do Corte", weight: 35, evaluations: [] },
+              { id: "c3", corteNum: 3, name: "3er Corte", weight: 35, evaluations: [] },
+            ],
+          };
+        }
       } else {
         createdItem = {
           id: `local_${Date.now()}`,
@@ -432,17 +449,16 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
       setSubjects((prev) => [createdItem, ...prev]);
       setShowAddSubjectModal(false);
       setNewSubjectName("");
-      confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
     } catch (err: any) {
-      alert(err?.message || "Error al crear la asignatura.");
+      console.error("[NotesTab] Error al crear materia:", err);
     } finally {
       setIsSavingSubject(false);
     }
   };
 
-  // Eliminar Asignatura
+  // Eliminar Materia
   const handleDeleteSubject = async (subjId: string, backendId?: number) => {
-    if (!window.confirm("¿Estás seguro de eliminar esta asignatura y todas sus evaluaciones?")) return;
+    if (!window.confirm("¿Estás seguro de eliminar esta materia y todas sus evaluaciones?")) return;
     if (backendId && getStoredToken()) {
       try {
         await subjectService.deleteSubject(backendId);
@@ -465,8 +481,9 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
     try {
       const corteNum = activeCorte.corteNum || activeCorteIndex + 1;
       const gradeNum = parseFloat(evalGrade) || 0;
-      const maxGradeNum = parseFloat(evalMaxGrade) || (selectedSubject.maxScale || 10);
+      const maxGradeNum = selectedSubject.maxScale || globalScale || 10;
       const weightNum = parseFloat(evalWeight) || 0;
+      const autoDate = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date());
 
       let evalBackendId: number | undefined;
 
@@ -479,7 +496,7 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
             nota: gradeNum,
             max_nota: maxGradeNum,
             peso_porcentaje: weightNum,
-            fecha: evalDate || "Hoy",
+            fecha: autoDate,
           });
           evalBackendId = createdEval.id_evaluacion;
         } catch (apiErr: any) {
@@ -492,7 +509,7 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
         backendId: evalBackendId,
         name: evalName.trim(),
         type: evalType,
-        date: evalDate || "Hoy",
+        date: autoDate,
         grade: gradeNum,
         maxGrade: maxGradeNum,
         weight: weightNum,
@@ -1076,69 +1093,52 @@ Nombre</label>
                 />
               </div>
 
-              {/* Grid: Tipo & Fecha */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className={`block font-semibold ${activeLight ? "text-slate-700" : "text-slate-300"}`}>
-                    Tipo de nota
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {EVAL_TYPES.map((t) => {
-                      const isSelected = evalType === t.id;
-                      const IconComp = t.icon;
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setEvalType(t.id)}
-                          className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer select-none ${
-                            isSelected
-                              ? activeLight
-                                ? "bg-purple-100 text-purple-900 border-purple-400 shadow-xs ring-1 ring-purple-300 font-bold"
-                                : "bg-purple-900/60 text-purple-200 border-purple-500 shadow-md ring-1 ring-purple-500/50 font-bold"
-                              : activeLight
-                              ? "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                              : "bg-[#080912] border-[#1e2338] text-slate-400 hover:bg-[#12162a] hover:text-white"
-                          }`}
-                        >
-                          <IconComp className="w-3.5 h-3.5 shrink-0" />
-                          <span>{t.label}</span>
-                          {isSelected && (
-                            <Check className="w-3 h-3 ml-0.5 text-purple-600" strokeWidth={2.5} />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className={`block font-medium ${activeLight ? "text-slate-700" : "text-slate-400"}`}>
-Fecha</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={evalDate}
-                      onChange={(e) => setEvalDate(e.target.value)}
-                      className={`w-full rounded-xl px-4 py-2.5 text-xs transition focus:outline-none ${activeLight ? "bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:border-purple-400" : "bg-[#080912] border border-[#1e2338] text-white focus:border-indigo-500"}`}
-                    />
-                    <Calendar className="w-3.5 h-3.5 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
+              {/* Field: Tipo de nota */}
+              <div className="space-y-1.5">
+                <label className={`block font-semibold ${activeLight ? "text-slate-700" : "text-slate-300"}`}>
+                  Tipo de nota
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {EVAL_TYPES.map((t) => {
+                    const isSelected = evalType === t.id;
+                    const IconComp = t.icon;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setEvalType(t.id)}
+                        className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer select-none ${
+                          isSelected
+                            ? activeLight
+                              ? "bg-purple-100 text-purple-900 border-purple-400 shadow-xs ring-1 ring-purple-300 font-bold"
+                              : "bg-purple-900/60 text-purple-200 border-purple-500 shadow-md ring-1 ring-purple-500/50 font-bold"
+                            : activeLight
+                            ? "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            : "bg-[#080912] border-[#1e2338] text-slate-400 hover:bg-[#12162a] hover:text-white"
+                        }`}
+                      >
+                        <IconComp className="w-3.5 h-3.5 shrink-0" />
+                        <span>{t.label}</span>
+                        {isSelected && (
+                          <Check className="w-3 h-3 ml-0.5 text-purple-600" strokeWidth={2.5} />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Grid: Calificación & Calificación máx */}
+              {/* Grid: Calificación & Peso en el corte (%) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className={`block font-medium ${activeLight ? "text-slate-700" : "text-slate-400"}`}>
-
                     Calificación
                   </label>
                   <input
                     type="number"
                     step="0.1"
                     min="0"
-                    max={globalScale}
+                    max={selectedSubject?.maxScale || globalScale || 10}
                     required
                     value={evalGrade}
                     onChange={(e) => setEvalGrade(e.target.value)}
@@ -1148,35 +1148,18 @@ Fecha</label>
 
                 <div className="space-y-1.5">
                   <label className={`block font-medium ${activeLight ? "text-slate-700" : "text-slate-400"}`}>
-
-                    Calificación máx.
+                    Peso en el corte (%)
                   </label>
                   <input
                     type="number"
-                    step="1"
                     min="1"
-                    value={evalMaxGrade}
-                    onChange={(e) => setEvalMaxGrade(e.target.value)}
+                    max="100"
+                    required
+                    value={evalWeight}
+                    onChange={(e) => setEvalWeight(e.target.value)}
                     className={`w-full rounded-xl px-4 py-2.5 text-xs transition focus:outline-none ${activeLight ? "bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:border-purple-400" : "bg-[#080912] border border-[#1e2338] text-white focus:border-indigo-500"}`}
                   />
                 </div>
-              </div>
-
-              {/* Field: Peso en el corte (%) */}
-              <div className="space-y-1.5">
-                <label className={`block font-medium ${activeLight ? "text-slate-700" : "text-slate-400"}`}>
-
-                  Peso en el corte (%)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  required
-                  value={evalWeight}
-                  onChange={(e) => setEvalWeight(e.target.value)}
-                  className={`w-full rounded-xl px-4 py-2.5 text-xs transition focus:outline-none ${activeLight ? "bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:border-purple-400" : "bg-[#080912] border border-[#1e2338] text-white focus:border-indigo-500"}`}
-                />
               </div>
 
               {/* Form Action Buttons */}
@@ -1234,7 +1217,7 @@ Fecha</label>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className={`text-xl sm:text-2xl font-bold tracking-tight ${activeLight ? "text-slate-900" : "text-white"}`}>
-            Asignaturas & Notas
+            Materias & Notas
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5">
             Registro por cortes académicos y proyecciones de aprobación — semestre actual.
@@ -1300,7 +1283,7 @@ Fecha</label>
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-md shadow-purple-900/15 transition active:scale-95 shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Nueva asignatura</span>
+            <span>Nueva materia</span>
           </button>
         </div>
       </div>
@@ -1353,7 +1336,7 @@ Fecha</label>
               <BookOpen className="w-6 h-6" />
             </div>
             <h4 className={`text-base font-bold ${activeLight ? "text-slate-900" : "text-white"}`}>
-              No tienes asignaturas registradas
+              No tienes materias registradas
             </h4>
             <p className="text-xs text-slate-400 max-w-sm">
               Agrega tus materias del semestre para llevar el control de notas, cortes y calcular tu promedio ponderado automáticamente.
@@ -1634,14 +1617,14 @@ Fecha</label>
         </div>
       </div>
 
-      {/* Modal: Crear Nueva Asignatura (Sincronizado con BD) */}
+      {/* Modal: Crear Nueva Materia (Sincronizado con BD) */}
       {showAddSubjectModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className={`w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150 space-y-4 border ${activeLight ? "bg-white border-slate-200 text-slate-900" : "bg-[#0c0e1a] border-[#1e233d] text-white"}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${activeLight ? "border-slate-100" : "border-[#181c30]"}`}>
               <h3 className={`text-base font-bold flex items-center gap-2 ${activeLight ? "text-slate-900" : "text-white"}`}>
                 <BookOpen className="w-4 h-4 text-[#7c5dfa]" />
-                <span>Nueva Asignatura</span>
+                <span>Nueva Materia</span>
               </h3>
               <button
                 onClick={() => setShowAddSubjectModal(false)}
@@ -1652,10 +1635,10 @@ Fecha</label>
             </div>
 
             <form onSubmit={handleCreateSubject} className="space-y-4 text-xs">
-              {/* Nombre de la asignatura */}
+              {/* Nombre de la materia */}
               <div className="space-y-1.5">
                 <label className={`font-semibold block ${activeLight ? "text-slate-700" : "text-slate-300"}`}>
-                  Nombre de la asignatura *
+                  Nombre de la materia *
                 </label>
                 <input
                   type="text"
@@ -1751,7 +1734,7 @@ Fecha</label>
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold flex items-center gap-2 shadow-md shadow-purple-900/15 disabled:opacity-60 cursor-pointer"
                 >
                   {isSavingSubject && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Crear Asignatura</span>
+                  <span>Crear Materia</span>
                 </button>
               </div>
             </form>

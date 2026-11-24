@@ -863,7 +863,7 @@ export default function ScheduleTab({ isLightMode = false }: ScheduleTabProps) {
                     Registrar Clase en Horario
                   </h3>
                   <p className={`text-xs ${isLightMode ? "text-slate-500" : "text-slate-400"}`}>
-                    Configura la asignatura, sesión y salón de clase
+                    Configura la materia, sesión y salón de clase
                   </p>
                 </div>
               </div>
@@ -884,7 +884,7 @@ export default function ScheduleTab({ isLightMode = false }: ScheduleTabProps) {
               {/* Título de la Materia */}
               <div className="space-y-1.5">
                 <label className={`font-semibold block ${isLightMode ? "text-slate-700" : "text-slate-300"}`}>
-                  Nombre de la Asignatura / Actividad
+                  Nombre de la Materia / Actividad
                 </label>
                 <input
                   type="text"

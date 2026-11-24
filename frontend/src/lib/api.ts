@@ -18,7 +18,11 @@ export class ApiError extends Error {
 
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("dalat_token");
+  const token = localStorage.getItem("dalat_token");
+  if (!token || token === "null" || token === "undefined" || token.trim() === "") {
+    return null;
+  }
+  return token;
 }
 
 export function setStoredToken(token: string | null): void {
@@ -48,11 +52,12 @@ export async function apiFetch<T>(
     ...(customHeaders as Record<string, string>),
   };
 
-  if (requiresAuth) {
-    const token = getStoredToken();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+  const token = getStoredToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  } else if (requiresAuth) {
+    // Si la ruta requiere autenticación estricta y no hay token disponible
+    console.warn(`[apiFetch] Ruta protegida llamada sin token: ${endpoint}`);
   }
 
   try {
@@ -71,6 +76,9 @@ export async function apiFetch<T>(
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        setStoredToken(null);
+      }
       // Manejar mensajes de error de FastAPI (detail o mensaje plano)
       const errorMessage =
         (responseData && typeof responseData === "object" && responseData.detail) ||

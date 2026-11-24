@@ -39,6 +39,7 @@ def generar_recurso_estudio(
             "Guia": 4,
             "Pack_General": 2,      # Pack 1 con descuento: 2 tokens (antes 3)
             "Pack_Matematicas": 7,  # Pack 2 con descuento: 7 tokens (antes 10)
+            "Psicopata": 0,         # Ya descontado explícitamente vía /api/users/deduct-tokens
         }
         costo = costos.get(req.tipo_recurso, 2)
         current_user.tokens_disponibles = max(0, (current_user.tokens_disponibles or 0) - costo)
