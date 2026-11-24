@@ -1390,43 +1390,20 @@ export default function AiResourcesTab({
             <div>
               {!isQuizFinished ? (
                 <div className="space-y-6 max-w-2xl mx-auto">
-                  {/* Barra de progreso y botón Descargar PDF */}
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex justify-between text-xs text-slate-400 font-medium">
-                        <span>Pregunta {currentQuestionIndex + 1} de {resolvedExamenData.length}</span>
-                        <span>Correctas: <strong className="text-emerald-400">{correctCount}</strong></span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-[#161a2b] overflow-hidden">
-                        <div
-                          className="h-full bg-[#7c5dfa] transition-all duration-300"
-                          style={{
-                            width: `${((currentQuestionIndex + 1) / resolvedExamenData.length) * 100}%`,
-                          }}
-                        />
-                      </div>
+                  {/* Barra de progreso */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs text-slate-400 font-medium">
+                      <span>Pregunta {currentQuestionIndex + 1} de {resolvedExamenData.length}</span>
+                      <span>Correctas: <strong className="text-emerald-400">{correctCount}</strong></span>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        exportExamToPDF({
-                          tema: activeResource.tema,
-                          materia: activeResource.materia,
-                          dificultad: activeResource.dificultad,
-                          preguntas: resolvedExamenData,
-                        })
-                      }
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border shadow-xs shrink-0 ${
-                        activeLight
-                          ? "bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200"
-                          : "bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/40"
-                      }`}
-                      title="Descargar examen en PDF"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Descargar PDF</span>
-                    </button>
+                    <div className="w-full h-1.5 rounded-full bg-[#161a2b] overflow-hidden">
+                      <div
+                        className="h-full bg-[#7c5dfa] transition-all duration-300"
+                        style={{
+                          width: `${((currentQuestionIndex + 1) / resolvedExamenData.length) * 100}%`,
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {/* Pregunta */}
