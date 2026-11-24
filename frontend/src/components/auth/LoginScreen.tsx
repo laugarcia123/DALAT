@@ -359,7 +359,7 @@ export default function LoginScreen({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete="email"
-                    placeholder="tucorreo@universidad.edu.co"
+                    placeholder="tucorreo@gmail.com"
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
                   />
                 </div>
@@ -571,7 +571,7 @@ export default function LoginScreen({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="andrea@universidad.edu.co"
+                  placeholder="tucorreo@gmail.com"
                   className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                 />
               </div>
@@ -1025,7 +1025,7 @@ export default function LoginScreen({
                     value={recoveryEmail}
                     onChange={(e) => setRecoveryEmail(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl bg-[#080a15] border border-white/[0.1] text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-400"
-                    placeholder="tu.correo@universidad.edu.co"
+                    placeholder="tucorreo@gmail.com"
                   />
                 </div>
 
