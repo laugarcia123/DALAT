@@ -61,17 +61,17 @@ export default function LoginScreen({
   // In Login mode: "normal" | "institucion"
   const [loginType, setLoginType] = useState<"normal" | "institucion">("normal");
 
-  // Inputs
-  const [name, setName] = useState(defaultName || "Daniel Granados");
-  const [email, setEmail] = useState(defaultEmail || "danielgaber@gmail.com");
-  const [password, setPassword] = useState("123456hola");
+  // Inputs limpios sin credenciales fijas
+  const [name, setName] = useState(defaultName || "");
+  const [email, setEmail] = useState(defaultEmail || "");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Institution specific inputs
   const [selectedInstitution, setSelectedInstitution] = useState(INSTITUTIONS_LIST[0]);
   const [customInstitution, setCustomInstitution] = useState("");
-  const [institutionalEmail, setInstitutionalEmail] = useState("estudiante@unal.edu.co");
+  const [institutionalEmail, setInstitutionalEmail] = useState("");
 
   const { login, register, socialLogin } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -358,7 +358,8 @@ export default function LoginScreen({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="andrea@universidad.edu.co"
+                    autoComplete="email"
+                    placeholder="tucorreo@universidad.edu.co"
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
                   />
                 </div>
@@ -383,6 +384,7 @@ export default function LoginScreen({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === "register" ? "new-password" : "current-password"}
                   placeholder="••••••••"
                   className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-[#070914] border border-white/[0.1] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
                 />
