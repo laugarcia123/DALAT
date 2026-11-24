@@ -22,15 +22,22 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Configuración de CORS para permitir la comunicación con el frontend de Next.js
+import os
+
+# Configuración de CORS para permitir la comunicación con el frontend de Next.js (Local y Vercel)
+frontend_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+]
+env_frontend = os.getenv("FRONTEND_URL")
+if env_frontend:
+    frontend_origins.append(env_frontend.rstrip("/"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3000",
-        "*"
-    ],
+    allow_origins=frontend_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.dalat\.app|http://localhost:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -10,8 +10,10 @@ DATABASE_URL = os.getenv(
     "postgresql+psycopg2://postgres:admin123@127.0.0.1:5432/dalat_db"
 )
 
-# Correccion de dialecto para psycopg2 en SQLAlchemy 2.0+
-if DATABASE_URL.startswith("postgresql://"):
+# Correccion de dialecto para psycopg2 en SQLAlchemy 2.0+ (Render usa postgres://)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 try:
