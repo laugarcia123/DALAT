@@ -323,11 +323,17 @@ export default function AiResourcesTab({
             ? "ppt"
             : "pdf";
 
+          const eq = Array.isArray(eqData) ? eqData.find((e) => e.id_equipo === doc.id_equipo) : null;
+          const subjectResolved =
+            (eq?.nombre && eq.nombre !== "General" ? eq.nombre : eq?.materia) ||
+            doc.descripcion ||
+            "Repositorio Académico";
+
           return {
             id: `doc_${doc.id_documento}`,
             backendDocId: doc.id_documento,
             name: doc.nombre,
-            subject: doc.descripcion || "Repositorio Académico",
+            subject: subjectResolved,
             size: doc.tamano || "1.0 MB",
             type: ext,
             isLink,

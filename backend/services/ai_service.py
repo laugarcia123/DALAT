@@ -351,69 +351,152 @@ def _generar_local_heuristico(req: GenerarRecursoRequest) -> Any:
     else:
         examen_general_demo = []
 
+    meta_texto = f"{materia} {tema} {req.archivo_nombre or ''}".lower()
+    es_derecho = any(k in meta_texto for k in ["derecho", "ley", "jurid", "administrativ", "constitucional", "civil", "penal", "norma", "acto", "codigo", "abogad", "fiscal", "tutela", "sentencia", "jurisprudencia"])
+    es_salud = any(k in meta_texto for k in ["medicin", "salud", "anatomic", "farmaco", "fisiolog", "clinica", "enfermer", "biolog", "patolog", "quirurg"])
+
     if not examen_general_demo:
-        examen_general_demo = [
-        {
-            "id": 1,
-            "pregunta": f"En el análisis estructural de '{tema}', ¿cuál es la razón fundamental por la que optimizar variables locales de forma aislada puede comprometer el rendimiento global del sistema?",
-            "opciones": [
-                "Porque los acoplamientos y dependencias no lineales entre subsistemas pueden desplazar el cuello de botella hacia componentes críticos no monitoreados.",
-                "Porque la tasa de variación temporal de las variables de estado siempre se anula en ausencia de perturbaciones estocásticas externas.",
-                "Porque los modelos deterministas exigen que todas las funciones de transferencia presenten simetría puntual respecto al origen.",
-                "Porque la varianza residual del sistema se amplifica únicamente cuando los parámetros operativos operan en estado estacionario."
-            ],
-            "indice_correcto": 0,
-            "explicacion": "En sistemas complejos, las interacciones cruzadas hacen que una optimización local subóptima desplace restricciones críticas. Las opciones B, C y D representan confusiones teóricas comunes sobre invariancia y estado estacionario."
-        },
-        {
-            "id": 2,
-            "pregunta": f"Al contrastar un modelo predictivo de '{tema}' con datos experimentales en {materia}, ¿qué fenómeno revela típicamente una alta correlación R² acompañada de un elevado error de generalización en validación cruzada?",
-            "opciones": [
-                "Sobreajuste (overfitting) debido a la sobreparametrización del modelo frente a la dimensionalidad real de la muestra.",
-                "Subajuste severo (underfitting) ocasionado por una excesiva regularización de los coeficientes de regresión.",
-                "Colinealidad perfecta entre variables independientes que anula el sesgo intrínseco del estimador.",
-                "Convergencia asintótica prematura del algoritmo de optimización hacia un punto de ensilladura."
-            ],
-            "indice_correcto": 0,
-            "explicacion": "Un R² elevado en entrenamiento con baja capacidad de generalización es el síntoma clásico de sobreajuste. La opción B afirma lo opuesto, mientras que C y D aluden a patologías numéricas distintas."
-        },
-        {
-            "id": 3,
-            "pregunta": f"Bajo qué criterio se valida rigurosamente la estabilidad de un proceso continuo en '{tema}' ante perturbaciones transitorias?",
-            "opciones": [
-                "Demostrando que la función de Lyapunov asociada posee derivada temporal semidefinida negativa en la región de atracción.",
-                "Comprobando que la respuesta al escalón unitario alcance su valor asintótico en un tiempo estrictamente inferior a la constante de tiempo.",
-                "Verificando que la matriz de covarianza de las perturbaciones tenga traza estrictamente nula en el régimen permanente.",
-                "Asumiendo que las fluctuaciones de alta frecuencia son filtradas de manera pasiva sin amortiguamiento viscoso."
-            ],
-            "indice_correcto": 0,
-            "explicacion": "El segundo método de Lyapunov es el criterio analítico definitivo de estabilidad asintótica. La opción B confunde rapidez de respuesta con estabilidad, y C confunde ruido con propiedades dinámicas del sistema."
-        },
-        {
-            "id": 4,
-            "pregunta": f"¿Cuál es el trade-off técnico fundamental al implementar un esquema de control predictivo o adaptativo en '{tema}'?",
-            "opciones": [
-                "El balance entre la velocidad de convergencia ante cambios dinámicos y la robustez frente a incertidumbre en los parámetros del modelo.",
-                "El compromiso entre la reducción de costos energéticos y la eliminación absoluta de retardos de transporte en la planta.",
-                "La disyuntiva entre linealizar el sistema en torno a un punto de operación o prescindir de sensores de retroalimentación.",
-                "La tensión entre aumentar la frecuencia de muestreo y garantizar que la entropía del controlador permanezca constante."
-            ],
-            "indice_correcto": 0,
-            "explicacion": "El compromiso clásico en control avanzado es velocidad versus robustez ante incertidumbre del modelo. Las opciones B, C y D proponen premisas técnicamente inválidas o incompatibles con la teoría de control."
-        },
-        {
-            "id": 5,
-            "pregunta": f"Al analizar la sensibilidad paramétrica en '{tema}', ¿qué indica un coeficiente de elasticidad normalizado mayor a la unidad?",
-            "opciones": [
-                "Que una variación porcentual en el parámetro genera un cambio porcentual amplificado en la respuesta (comportamiento elástico).",
-                "Que el parámetro evaluado es invariante y no ejerce influencia significativa sobre el régimen dinámico de la variable.",
-                "Que la función de respuesta presenta una discontinuidad esencial de primera especie en el punto de evaluación nominal.",
-                "Que el sistema es estrictamente disipativo y disipa energía proporcionalmente al cuadrado de la perturbación inicial."
-            ],
-            "indice_correcto": 0,
-            "explicacion": "Una elasticidad o sensibilidad normalizada mayor a 1 implica que las perturbaciones en el parámetro se amplifican en la salida. La opción B confunde alta sensibilidad con invariancia, y C y D son conceptos matemáticos mal aplicados."
-        }
-    ]
+        if es_derecho:
+            examen_general_demo = [
+                {
+                    "id": 1,
+                    "pregunta": f"En el marco del Derecho Administrativo y la teoría de los actos administrativos: ¿Cuál es el fundamento dogmático de la presunción de legalidad y ejecutoriedad de las decisiones estatales?",
+                    "opciones": [
+                        "Que todo acto administrativo se presume expedido conforme al ordenamiento jurídico superior y produce plenos efectos obligatorios hasta que la jurisdicción competente declare su nulidad o se suspenda provisionalmente.",
+                        "Que la Administración Pública no está obligada a fundamentar sus motivos cuando actúa en ejercicio de facultades regladas frente a particulares.",
+                        "Que los actos administrativos adquieren firmeza irrevocable e inimpugnable de manera automática desde el instante de su firma por el funcionario.",
+                        "Que la voluntad unilateral de la autoridad prevalece de manera absoluta sobre los derechos subjetivos sin posibilidad de control judicial."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "La presunción de legalidad confiere validez y eficacia inmediata al acto administrativo mientras no sea desvirtuada ante la Jurisdicción de lo Contencioso Administrativo. Las opciones B, C y D desconocen los límites del Estado de Derecho y el debido proceso."
+                },
+                {
+                    "id": 2,
+                    "pregunta": f"Respecto a los vicios que afectan la validez del acto administrativo: ¿En qué consiste la causal de 'Desviación de Poder'?",
+                    "opciones": [
+                        "En expedir el acto con apariencia de legalidad formal pero persiguiendo un fin distinto al interés general o ajeno al propósito asignado expresamente por la norma que otorgó la competencia.",
+                        "En proferir la decisión fuera del término legal establecido en el Código de Procedimiento Administrativo.",
+                        "En la manifiesta incompetencia territorial o funcional del funcionario público que suscribe el acto.",
+                        "En omitir la notificación personal al administrado cuando la ley exigía únicamente su publicación en gaceta."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "La desviación de poder sanciona la adulteración de la teleología del acto: la autoridad usa una potestad legal para fines particulares, políticos o encubiertos. Las opciones B, C y D corresponden a vicios de forma, incompetencia o indebida notificación."
+                },
+                {
+                    "id": 3,
+                    "pregunta": f"En el régimen contencioso administrativo: ¿Qué diferencia sustancial existe entre el medio de control de Simple Nulidad y el de Nulidad y Restablecimiento del Derecho?",
+                    "opciones": [
+                        "La Simple Nulidad protege la legalidad objetiva y el orden público abstracto con legitimación universal, mientras que la Nulidad y Restablecimiento busca resarcir un derecho subjetivo vulnerado y tiene un término de caducidad estricto (4 meses).",
+                        "La Simple Nulidad exige agotar obligatoriamente los recursos de la vía administrativa, mientras que el restablecimiento del derecho no requiere pronunciamiento previo de la entidad.",
+                        "La Simple Nulidad únicamente procede contra actos de contenido particular y concreto con efectos patrimoniales directos.",
+                        "Ambos medios de control persiguen indemnización pecuniaria, diferenciándose únicamente en el monto de la cuantía fijada en la demanda."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "La simple nulidad defiende el ordenamiento jurídico general (cualquiera puede demandar en cualquier tiempo), mientras que la nulidad y restablecimiento ampara derechos individuales agraviados y caduca en cuatro meses. Las opciones B, C y D son contrarias a la dogmática procesal."
+                },
+                {
+                    "id": 4,
+                    "pregunta": f"Frente a la inactividad de la Administración: ¿Cómo opera la figura procesal del Silencio Administrativo Negativo?",
+                    "opciones": [
+                        "Como una ficción legal procesal que faculta al administrado a considerar desestimada su petición para acudir a los recursos administrativos o demandar ante la jurisdicción contenciosa.",
+                        "Como una sanción disciplinaria automática de destitución contra el funcionario que omitió dar respuesta oportuna.",
+                        "Como una aceptación tácita e incondicional de todas las pretensiones y solicitudes formuladas por el ciudadano.",
+                        "Como la extinción definitiva del derecho reclamado por haber operado la prescripción adquisitiva a favor del Estado."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "El silencio negativo no es un acto administrativo real sino una garantía procesal que impide que la inercia estatal bloquee indefinidamente el acceso a la justicia. La opción C describe el silencio positivo (excepcional), y B y D son figuras jurídicas erróneas."
+                },
+                {
+                    "id": 5,
+                    "pregunta": f"En la responsabilidad patrimonial del Estado (Art. 90 CP): ¿Bajo qué título de imputación responde la administración pública en casos de Daño Especial?",
+                    "opciones": [
+                        "Responsabilidad de régimen objetivo fundamentada en el principio de igualdad ante las cargas públicas, donde un actuar legítimo del Estado genera una carga desproporcionada y singular sobre un particular.",
+                        "Responsabilidad subjetiva basada exclusivamente en la culpa probada o negligencia grave en la conducta de los agentes estatales.",
+                        "Régimen de falta disciplinaria que exige demostrar la intención dolosa del servidor público causante de la perturbación.",
+                        "Responsabilidad subsidiaria que solo se activa cuando se declara la quiebra financiera de la entidad pública demandada."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "El daño especial opera bajo el régimen objetivo: la actuación administrativa puede ser plenamente legítima, pero al romper la equidad en el reparto de las cargas públicas, impone al Estado el deber de indemnizar al afectado."
+                }
+            ]
+        elif es_salud:
+            examen_general_demo = [
+                {
+                    "id": 1,
+                    "pregunta": f"En el razonamiento clínico y farmacológico de '{materia}': ¿Cuál es el mecanismo fisiopatológico primario a considerar ante un cuadro de descompensación aguda?",
+                    "opciones": [
+                        "La pérdida de autorregulación hemodinámica y la alteración en la perfusión tisular sistémica.",
+                        "La supresión completa de los receptores intracelulares sin afectación de la gradiente osmótica.",
+                        "El incremento idiopático de la volemia sin repercusión en la poscarga ventricular.",
+                        "La inhibición irreversible de la glucólisis anaeróbica en el miocardio."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "La perfusión tisular insuficiente es el factor crítico en fallas orgánicas agudas."
+                }
+            ]
+        else:
+            examen_general_demo = [
+                {
+                    "id": 1,
+                    "pregunta": f"En el análisis de '{tema}' dentro de la disciplina de '{materia}': ¿Cuál es el principio fundamental que rige la relación entre sus conceptos estructurantes?",
+                    "opciones": [
+                        "La interdependencia funcional entre los marcos conceptuales y la validación empírica de sus postulados.",
+                        "La subordinación absoluta a criterios preestablecidos sin posibilidad de contrastación crítica.",
+                        "La invariancia estática de los principios teóricos independientemente del contexto de aplicación.",
+                        "La desconexión metodológica entre la formulación dogmática y su ejercicio operativo."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "El rigor académico exige contrastar los fundamentos teóricos con su implementación práctica."
+                },
+                {
+                    "id": 2,
+                    "pregunta": f"Al evaluar críticamente las fuentes y premisas de '{tema}': ¿Qué criterio metodológico garantiza la mayor validez analítica?",
+                    "opciones": [
+                        "El contraste sistemático entre la doctrina especializada y los datos observables en el campo de estudio.",
+                        "La aceptación acrítica de fuentes secundarias desprovistas de revisión por pares.",
+                        "La extrapolación indiscriminada de conclusiones locales a escenarios normativos divergentes.",
+                        "La sustitución de la argumentación fundamentada por apreciaciones puramente subjetivas."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "La contrastación sistemática de fuentes primarias es el estándar de rigor académico superior."
+                },
+                {
+                    "id": 3,
+                    "pregunta": f"En la aplicación práctica de los conocimientos relativos a '{tema}': ¿Cuál es la estrategia pedagógica más efectiva para consolidar el dominio conceptual?",
+                    "opciones": [
+                        "La resolución activa de casos y problemas complejos acompañada de retroalimentación inmediata.",
+                        "La memorización mecánica de definiciones aisladas sin contexto ni aplicación.",
+                        "La postergación de la práctica evaluativa hasta finalizar la totalidad del plan de estudios.",
+                        "La lectura pasiva reiterada sin autoevaluación ni contrastación de ideas clave."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "La práctica deliberada y la resolución de casos es el estándar más respaldado por la ciencia del aprendizaje."
+                },
+                {
+                    "id": 4,
+                    "pregunta": f"Al estructurar una síntesis analítica sobre los tópicos centrales de '{tema}': ¿Qué elemento resulta indispensable?",
+                    "opciones": [
+                        "La jerarquización clara de las ideas principales y la articulación lógica con sus fundamentos.",
+                        "La omisión de los principios rectores para concentrarse únicamente en aspectos accesorios.",
+                        "El tratamiento desarticulado de los conceptos sin establecer relaciones causales.",
+                        "La recopilación acrítica de datos sin someterlos a un filtro metodológico riguroso."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "Una síntesis efectiva exige jerarquía y articulación lógica de las ideas clave."
+                },
+                {
+                    "id": 5,
+                    "pregunta": f"Frente a discrepancias doctrinales o metodológicas en el estudio de '{tema}': ¿Cómo debe proceder el análisis académico?",
+                    "opciones": [
+                        "Ponderando los fundamentos argumentativos de cada postura a la luz de las fuentes primarias.",
+                        "Adoptando la postura más reciente sin verificar su solidez argumentativa ni empírica.",
+                        "Descartando de plano cualquier perspectiva que difiera de la postura hegemónica tradicional.",
+                        "Sustituyendo la deliberación razonada por criterios de mera preferencia subjetiva."
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": "La ponderación crítica de argumentos frente a fuentes directas es el método científico y académico por excelencia."
+                }
+            ]
 
     examen_matematicas_demo = [
         {
@@ -478,103 +561,202 @@ def _generar_local_heuristico(req: GenerarRecursoRequest) -> Any:
         }
     ]
 
-    flashcards_demo = [
-        {
-            "id": 1,
-            "anverso": f"¿Qué principio fundamental rige {tema}?",
-            "reverso": f"La optimización de variables y el control de parámetros críticos dentro de {materia}.",
-            "categoria": "Fundamento",
-            "dificultad": dificultad
-        },
-        {
-            "id": 2,
-            "anverso": "¿Cómo se define la eficiencia de un modelo operativo?",
-            "reverso": "La relación entre el rendimiento obtenido y los recursos o energía invertidos.",
-            "categoria": "Optimización",
-            "dificultad": dificultad
-        },
-        {
-            "id": 3,
-            "anverso": "¿Por qué es crucial la evaluación continua de brechas de conocimiento?",
-            "reverso": "Permite detectar inconsistencias antes de abordar problemas complejos de nivel avanzado.",
-            "categoria": "Metodología",
-            "dificultad": dificultad
-        },
-        {
-            "id": 4,
-            "anverso": f"¿Qué rol juega el contexto en el análisis de {tema}?",
-            "reverso": "Define las restricciones de frontera y los supuestos bajo los cuales el modelo es válido.",
-            "categoria": "Condiciones",
-            "dificultad": dificultad
-        },
-        {
-            "id": 5,
-            "anverso": "¿Cuál es la ventaja de la práctica activa frente al repaso pasivo?",
-            "reverso": "Estimula el esfuerzo cognitivo, fortaleciendo la recuperación de información a largo plazo.",
-            "categoria": "Didáctica",
-            "dificultad": dificultad
-        },
-        {
-            "id": 6,
-            "anverso": "¿Cómo se interpretan las anomalías en un conjunto de datos?",
-            "reverso": "Como indicadores de fallas de calibración o fenómenos no contemplados en el modelo inicial.",
-            "categoria": "Análisis Crítico",
-            "dificultad": dificultad
+    if es_derecho:
+        flashcards_demo = [
+            {
+                "id": 1,
+                "anverso": "¿Qué es la presunción de legalidad del acto administrativo?",
+                "reverso": "Es la garantía jurídica que presume que todo acto administrativo fue expedido conforme a derecho, manteniendo su vigencia y obligatoriedad mientras no sea suspendido o anulado por la jurisdicción competente.",
+                "categoria": "Teoría del Acto Administrativo",
+                "dificultad": dificultad
+            },
+            {
+                "id": 2,
+                "anverso": "¿En qué se diferencia el medio de control de Simple Nulidad del de Nulidad y Restablecimiento del Derecho?",
+                "reverso": "La Simple Nulidad defiende la legalidad objetiva abstracta, no caduca y tiene legitimación universal. La Nulidad y Restablecimiento protege derechos subjetivos particulares y caduca a los 4 meses.",
+                "categoria": "Medios de Control Contencioso",
+                "dificultad": dificultad
+            },
+            {
+                "id": 3,
+                "anverso": "¿Cómo opera la causal de nulidad por Desviación de Poder?",
+                "reverso": "Se configura cuando la autoridad ejerce una potestad con apego formal a la competencia legal, pero persiguiendo un propósito oculto, particular o ajeno al interés público.",
+                "categoria": "Vicios de Legalidad",
+                "dificultad": dificultad
+            },
+            {
+                "id": 4,
+                "anverso": "¿Cuál es la naturaleza jurídica del Silencio Administrativo Negativo?",
+                "reverso": "Es una ficción procesal y garantía legal para el administrado que le permite entender denegada su solicitud para interponer recursos o demandar ante la justicia, sin relevar a la entidad de su deber de responder.",
+                "categoria": "Procedimiento Administrativo",
+                "dificultad": dificultad
+            },
+            {
+                "id": 5,
+                "anverso": "¿Bajo qué título de imputación opera el Daño Especial en la responsabilidad estatal?",
+                "reverso": "Bajo régimen objetivo fundado en el principio de igualdad ante las cargas públicas, cuando una acción estatal legítima genera una carga anormal, grave e inequitativa a un particular.",
+                "categoria": "Responsabilidad del Estado",
+                "dificultad": dificultad
+            },
+            {
+                "id": 6,
+                "anverso": "¿Cuándo se produce la pérdida de fuerza ejecutoria de un acto administrativo?",
+                "reverso": "Por suspensión provisional, anulación judicial, revocatoria directa, cumplimiento del plazo o condición resolutoria, o transcurso de 5 años sin ejecución administrativa.",
+                "categoria": "Eficacia del Acto",
+                "dificultad": dificultad
+            }
+        ]
+
+        resumen_demo = {
+            "titulo": f"Resumen Dogmático y Jurisprudencial: {tema}",
+            "resumen_markdown": (
+                f"# Resumen Especializado de Derecho Administrativo: {tema}\n\n"
+                f"## 1. Fundamentos Constitucionales y Dogmática del Estado de Derecho\n"
+                f"El análisis de **{tema}** se enmarca en la sujeción estricta de las autoridades al principio de legalidad, debido proceso administrativo (Art. 29 CP) y la prevalencia del interés general sobre los intereses particulares.\n\n"
+                f"## 2. Estructura y Elementos de Validez del Acto Administrativo\n"
+                f"- **Competencia:** Aptitud jurídica atribuida por norma expresa a la autoridad emisora.\n"
+                f"- **Motivación Fáctica y Jurídica:** Exteriorización fundada de las razones de hecho y derecho que justifican la decisión.\n"
+                f"- **Finalidad Pública:** Proscripción absoluta de la desviación de poder y el actuar arbitrario.\n"
+                f"- **Procedimiento y Publicidad:** Trámite expedito, notificación legal y respeto a la contradicción probatoria.\n\n"
+                f"## 3. Mecanismos de Control y Responsabilidad Patrimonial\n"
+                f"Las decisiones de la administración son susceptibles de revisión administrativa (reposición, apelación) y control judicial ante la Jurisdicción de lo Contencioso Administrativo mediante los medios de Simple Nulidad y Nulidad y Restablecimiento del Derecho, garantizando la indemnización de perjuicios bajo regímenes objetivos y subjetivos."
+            ),
+            "puntos_clave": [
+                f"Principio de legalidad y presunción de validez de {tema}",
+                "Causales de anulación: incompetencia, falsa motivación y desviación de poder",
+                "Garantías procesales, contradicción y recursos obligatorios",
+                "Responsabilidad patrimonial del Estado y reparación integral"
+            ],
+            "formulas_o_conceptos": [
+                "Presunción de Legalidad y Ejecutoriedad",
+                "Medio de Control de Nulidad y Restablecimiento (Caducidad 4 meses)",
+                "Responsabilidad Estatal Objetivo-Solidaria (Art. 90 CP)"
+            ]
         }
-    ]
 
-    resumen_demo = {
-        "titulo": f"Resumen General de Alto Rendimiento: {tema}",
-        "resumen_markdown": (
-            f"# Resumen General: {tema}\n\n"
-            f"## 1. Introducción y Contexto\n"
-            f"El estudio de **{tema}** dentro de la disciplina de **{materia}** constituye un pilar esencial para la comprensión holística de los procesos analíticos.\n\n"
-            f"## 2. Pilares y Conceptos Fundamentales\n"
-            f"- **Identificación de Variables:** Separación rigurosa entre variables dependientes e independientes.\n"
-            f"- **Control de Parámetros:** Mitigación de factores de perturbación y ruido experimental.\n"
-            f"- **Evaluación de Rendimiento:** Medición constante de tasas de convergencia y eficiencia.\n\n"
-            f"## 3. Síntesis y Aplicación Práctica\n"
-            f"La implementación adecuada de estos conceptos asegura una toma de decisiones informada, reduciendo la incertidumbre operativa y maximizando la retención del estudiante."
-        ),
-        "puntos_clave": [
-            f"Dominio conceptual de {tema}",
-            "Control y calibración de parámetros",
-            "Evaluación empírica y contrastación de resultados",
-            "Optimización de recursos y mitigación de cuellos de botella"
-        ],
-        "formulas_o_conceptos": [
-            f"Principio de Eficiencia en {materia}",
-            "Tasa de transferencia operativa",
-            "Condiciones de frontera y convergencia"
+        guia_demo = {
+            "titulo": f"Guía Dogmática y Estudio de Casos: {tema}",
+            "resumen_markdown": (
+                f"# Ruta de Aprendizaje Jurídico: {tema}\n\n"
+                f"### Fase 1: Identificación Normativa y Fuentes Superiores\n"
+                f"Revisa los artículos constitucionales y normas del Código de Procedimiento Administrativo y de lo Contencioso Administrativo aplicables a **{tema}**.\n\n"
+                f"### Fase 2: Explicación y Subsunción Típica\n"
+                f"Formula la regla jurídica con tus propias palabras: 'Si se dan los supuestos de hecho X, la consecuencia jurídica que la ley impone es Y'.\n\n"
+                f"### Fase 3: Análisis de Vicios y Casos Problemáticos\n"
+                f"Identifica excepciones, causales de nulidad o supuestos de vulneración al debido proceso en los antecedentes fácticos.\n\n"
+                f"### Fase 4: Resolución de Caso y Redacción Argumentativa\n"
+                f"Aplica el test de proporcionalidad y formula la tesis defensiva o contenciosa con jurisprudencia unificada de las altas cortes."
+            ),
+            "puntos_clave": [
+                f"Análisis hermenéutico de {tema}",
+                "Identificación de causales de nulidad y recursos procedentes",
+                "Construcción silogística de argumentos jurídicos",
+                "Línea jurisprudencial consolidada"
+            ],
+            "formulas_o_conceptos": [
+                "Silogismo Jurídico y Subsunción",
+                "Juicio de Proporcionalidad y Razonabilidad",
+                "Precedente Jurisprudencial Vinculante"
+            ]
+        }
+    else:
+        flashcards_demo = [
+            {
+                "id": 1,
+                "anverso": f"¿Cuál es la premisa o fundamento central de '{tema}'?",
+                "reverso": f"La articulación coherente entre los principios teóricos y su contrastación analítica en la disciplina de {materia}.",
+                "categoria": "Fundamentos",
+                "dificultad": dificultad
+            },
+            {
+                "id": 2,
+                "anverso": "¿Cómo se diferencian las variables estructurales de las accesorias?",
+                "reverso": "Las estructurales determinan la validez y el comportamiento del modelo, mientras que las accesorias solo modulan aspectos secundarios.",
+                "categoria": "Estructura Teórica",
+                "dificultad": dificultad
+            },
+            {
+                "id": 3,
+                "anverso": "¿Por qué es crucial la contrastación de fuentes en el análisis académico?",
+                "reverso": "Permite mitigar sesgos de confirmación y asegurar que las conclusiones descansen en evidencia rigurosa y verificable.",
+                "categoria": "Metodología",
+                "dificultad": dificultad
+            },
+            {
+                "id": 4,
+                "anverso": f"¿Qué importancia tiene el contexto de aplicación en '{tema}'?",
+                "reverso": "Define los supuestos de validez y las condiciones de frontera bajo las cuales los postulados teóricos resultan aplicables.",
+                "categoria": "Condiciones",
+                "dificultad": dificultad
+            },
+            {
+                "id": 5,
+                "anverso": "¿Cuál es la ventaja de la recuperación activa frente a la lectura pasiva?",
+                "reverso": "Estimula el esfuerzo cognitivo de evocación, consolidando la memoria a largo plazo y la capacidad de transferencia a problemas nuevos.",
+                "categoria": "Ciencia del Aprendizaje",
+                "dificultad": dificultad
+            },
+            {
+                "id": 6,
+                "anverso": "¿Cómo debe abordarse una contradicción o anomalía conceptual?",
+                "reverso": "Sometiendo las premisas iniciales a falsación y contrastando con literatura especializada para refinar o reformular el marco teórico.",
+                "categoria": "Pensamiento Crítico",
+                "dificultad": dificultad
+            }
         ]
-    }
 
-    guia_demo = {
-        "titulo": f"Guía de Estudio Paso a Paso: {tema}",
-        "resumen_markdown": (
-            f"# Ruta de Aprendizaje Activo Feynman: {tema}\n\n"
-            f"Esta guía aplica la **Técnica Feynman** para desglosar los componentes conceptuales y operativos de **{tema}** con el máximo rigor pedagógico.\n\n"
-            f"### Fase 1: Selección y Estudio Inicial\n"
-            f"Identifica los pilares cuantitativos fundamentales de **{tema}**. Analiza las variables de estado, los vectores de flujo y las ecuaciones o principios que gobiernan el sistema.\n\n"
-            f"### Fase 2: Explicación Simplificada\n"
-            f"Explica el fenómeno como si se lo enseñaras a un estudiante principiante. Usa analogías intuitivas: cualquier acumulación interna equivale a la diferencia entre entradas y salidas menos pérdidas energéticas.\n\n"
-            f"### Fase 3: Identificación de Brechas\n"
-            f"Examina los datos numéricos y las condiciones de contorno. ¿Puedes justificar dimensionalmente cada término del problema? Verifica casos límite y anomalías.\n\n"
-            f"### Fase 4: Refinamiento y Analogía\n"
-            f"Conecta los principios teóricos con aplicaciones reales de ingeniería y optimización, asegurando un aprendizaje duradero y alta capacidad de resolución."
-        ),
-        "puntos_clave": [
-            f"Modelado sistemático de {tema}",
-            "Técnica Feynman en 4 fases de dominio",
-            "Análisis dimensional y casos límite",
-            "Ecuaciones de balance y conservación"
-        ],
-        "formulas_o_conceptos": [
-            "Ecuación de Continuidad y Balance: dM/dt = In - Out",
-            "Ley de Transferencia Térmica / Fricción: Q = -k * A * (dT/dx)",
-            "Optimización y Extremos Locales"
-        ]
-    }
+        resumen_demo = {
+            "titulo": f"Resumen Académico Estructurado: {tema}",
+            "resumen_markdown": (
+                f"# Resumen Académico: {tema}\n\n"
+                f"## 1. Introducción y Contexto Disciplinar\n"
+                f"El análisis riguroso de **{tema}** dentro de la disciplina de **{materia}** constituye una base fundamental para el dominio conceptual y la resolución fundamentada de problemas.\n\n"
+                f"## 2. Principios y Ejes Estructurantes\n"
+                f"- **Marco Conceptual Central:** Delimitación de premisas teóricas y conceptos clave.\n"
+                f"- **Relaciones Causales y Metodológicas:** Articulación lógica entre causas, efectos e implicaciones prácticas.\n"
+                f"- **Contrastación Crítica:** Evaluación frente a estándares académicos rigurosos.\n\n"
+                f"## 3. Síntesis y Aplicación Práctica\n"
+                f"El dominio de estos conceptos permite formular diagnósticos precisos, fundamentar juicios analíticos y optimizar el rendimiento en evaluaciones de nivel superior."
+            ),
+            "puntos_clave": [
+                f"Dominio conceptual y marco teórico de {tema}",
+                "Estructuración lógica de argumentos y premisas",
+                "Evaluación crítica y contrastación de fuentes",
+                "Transferencia práctica a casos y problemas complejos"
+            ],
+            "formulas_o_conceptos": [
+                f"Principios Fundamentales de {materia}",
+                "Criterios de Validez y Rigor Metodológico",
+                "Articulación Causal y Síntesis Analítica"
+            ]
+        }
+
+        guia_demo = {
+            "titulo": f"Guía de Aprendizaje Activo: {tema}",
+            "resumen_markdown": (
+                f"# Ruta de Aprendizaje Feynman: {tema}\n\n"
+                f"Esta guía aplica los 4 pasos de la **Técnica Feynman** para consolidar el dominio de **{tema}**.\n\n"
+                f"### Fase 1: Delimitación del Tema\n"
+                f"Identifica con precisión los 3 o 4 conceptos nucleares de **{tema}** y escribe sus definiciones con tus propias palabras.\n\n"
+                f"### Fase 2: Explicación en Lenguaje Claro\n"
+                f"Explica cada concepto simulando que se lo enseñas a un estudiante sin conocimientos previos. Usa analogías de la vida real.\n\n"
+                f"### Fase 3: Detección y Cierre de Brechas\n"
+                f"Vuelve a los materiales de estudio en aquellos puntos donde tu explicación se tornó confusa o recurrió a jerga innecesaria.\n\n"
+                f"### Fase 4: Síntesis y Transferencia Práctica\n"
+                f"Formula preguntas tipo examen y resuelve casos prácticos para verificar tu capacidad de aplicar el conocimiento."
+            ),
+            "puntos_clave": [
+                f"Ruta estructurada de aprendizaje para {tema}",
+                "Explicación intuitiva sin jerga técnica superficial",
+                "Identificación sistemática de brechas de comprensión",
+                "Práctica activa y autoevaluación deliberada"
+            ],
+            "formulas_o_conceptos": [
+                "Técnica Feynman de Aprendizaje Profundo",
+                "Práctica de Evocación Activa",
+                "Resolución y Transferencia a Casos Reales"
+            ]
+        }
 
     is_math_oriented = (
         "matematica" in materia.lower()
@@ -698,6 +880,13 @@ class AIService:
                 doc = db.query(DocumentoRepositorio).filter(DocumentoRepositorio.nombre == req.archivo_nombre).first()
             except Exception as e:
                 print(f"[AIService Document Lookup by Name Error] {e}")
+
+        if doc:
+            try:
+                if getattr(doc, "equipo", None) and (not req.materia or req.materia in ("General", "Repositorio Académico")):
+                    req.materia = doc.equipo.nombre or doc.equipo.materia or req.materia
+            except Exception as eq_err:
+                print(f"[AIService Equipo Resolution Error] {eq_err}")
 
         if doc and doc.url_recurso:
             try:
