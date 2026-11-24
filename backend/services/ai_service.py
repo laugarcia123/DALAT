@@ -704,31 +704,87 @@ class AIService:
                 from services.storage_service import StorageService
                 file_bytes = StorageService.get_file_bytes(doc.url_recurso)
                 if file_bytes:
-                    is_pdf = (doc.nombre or "").lower().endswith(".pdf") or "pdf" in (doc.formato or "").lower()
+                    fname = (doc.nombre or "").lower()
+                    formato = (doc.formato or "").lower()
+                    is_pdf = fname.endswith(".pdf") or "pdf" in formato
+                    is_docx = fname.endswith(".docx") or fname.endswith(".doc") or "word" in formato or "docx" in formato
+                    is_pptx = fname.endswith(".pptx") or fname.endswith(".ppt") or "powerpoint" in formato or "pptx" in formato
+                    is_txt = fname.endswith(".txt") or fname.endswith(".md") or "text" in formato
+
+                    # 1. Si es PDF (Texto + OCR Multimodal para escaneos)
                     if is_pdf:
-                        # 1.1 Extracción de texto con pypdf
                         try:
                             import io
                             from pypdf import PdfReader
                             reader = PdfReader(io.BytesIO(file_bytes))
                             pages_txt = []
-                            for p in reader.pages[:20]:
+                            for p in reader.pages[:25]:
                                 txt = p.extract_text()
                                 if txt and txt.strip():
                                     pages_txt.append(txt.strip())
                             extracted = "\n\n".join(pages_txt).strip()
                             if extracted and len(extracted) > 60:
-                                if not req.texto_adicional or len(req.texto_adicional) < 50:
-                                    req.texto_adicional = extracted[:12000]
-                                    print(f"[AIService] Texto extraído con pypdf: {len(extracted)} caracteres")
+                                req.texto_adicional = extracted[:15000]
+                                print(f"[AIService] PDF texto extraído con pypdf: {len(extracted)} caracteres")
                         except Exception as pe:
                             print(f"[pypdf extraction notice] {pe}")
 
-                        # 1.2 Si es menor a 15MB, pasar base64 para Gemini Multimodal OCR (esencial para CamScanner)
                         import base64
                         if len(file_bytes) <= 15 * 1024 * 1024:
                             pdf_base64 = base64.b64encode(file_bytes).decode("utf-8")
                             print(f"[AIService] PDF adjunto preparado para Gemini Multimodal OCR ({len(file_bytes)} bytes)")
+
+                    # 2. Si es Microsoft Word (.docx)
+                    elif is_docx:
+                        try:
+                            import io
+                            import docx
+                            doc_obj = docx.Document(io.BytesIO(file_bytes))
+                            paragraphs = [p.text.strip() for p in doc_obj.paragraphs if p.text and p.text.strip()]
+                            for table in doc_obj.tables:
+                                for row in table.rows:
+                                    row_text = " | ".join([cell.text.strip() for cell in row.cells if cell.text.strip()])
+                                    if row_text:
+                                        paragraphs.append(row_text)
+                            extracted = "\n\n".join(paragraphs).strip()
+                            if extracted:
+                                req.texto_adicional = extracted[:15000]
+                                print(f"[AIService] Word (.docx) texto extraído con éxito: {len(extracted)} caracteres")
+                        except Exception as de:
+                            print(f"[docx extraction notice] {de}")
+
+                    # 3. Si es Microsoft PowerPoint (.pptx)
+                    elif is_pptx:
+                        try:
+                            import io
+                            from pptx import Presentation
+                            prs = Presentation(io.BytesIO(file_bytes))
+                            slides_text = []
+                            for sIdx, slide in enumerate(prs.slides[:40]):
+                                slide_parts = [f"--- Diapositiva {sIdx + 1} ---"]
+                                for shape in slide.shapes:
+                                    if shape.has_text_frame and shape.text_frame:
+                                        for p in shape.text_frame.paragraphs:
+                                            if p.text and p.text.strip():
+                                                slide_parts.append(p.text.strip())
+                                if len(slide_parts) > 1:
+                                    slides_text.append("\n".join(slide_parts))
+                            extracted = "\n\n".join(slides_text).strip()
+                            if extracted:
+                                req.texto_adicional = extracted[:15000]
+                                print(f"[AIService] PowerPoint (.pptx) texto extraído con éxito: {len(extracted)} caracteres")
+                        except Exception as pte:
+                            print(f"[pptx extraction notice] {pte}")
+
+                    # 4. Si es Texto plano (.txt / .md)
+                    elif is_txt:
+                        try:
+                            extracted = file_bytes.decode("utf-8", errors="ignore").strip()
+                            if extracted:
+                                req.texto_adicional = extracted[:15000]
+                                print(f"[AIService] Texto plano (.txt/.md) extraído: {len(extracted)} caracteres")
+                        except Exception as te:
+                            print(f"[txt extraction notice] {te}")
             except Exception as e:
                 print(f"[AIService Document Fetch Error] {e}")
 
