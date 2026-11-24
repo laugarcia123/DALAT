@@ -687,15 +687,15 @@ class AIService:
         doc_id = getattr(req, "documento_id", None)
         if doc_id:
             try:
-                from models.repository import Documento
-                doc = db.query(Documento).filter(Documento.id_documento == doc_id).first()
+                from models.repository import DocumentoRepositorio
+                doc = db.query(DocumentoRepositorio).filter(DocumentoRepositorio.id_documento == doc_id).first()
             except Exception as e:
                 print(f"[AIService Document Lookup by ID Error] {e}")
 
         if not doc and req.archivo_nombre:
             try:
-                from models.repository import Documento
-                doc = db.query(Documento).filter(Documento.nombre == req.archivo_nombre).first()
+                from models.repository import DocumentoRepositorio
+                doc = db.query(DocumentoRepositorio).filter(DocumentoRepositorio.nombre == req.archivo_nombre).first()
             except Exception as e:
                 print(f"[AIService Document Lookup by Name Error] {e}")
 
