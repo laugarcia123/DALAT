@@ -225,10 +225,8 @@ def generar_con_gemini(req: GenerarRecursoRequest, api_key: str, pdf_base64: Opt
 
     # Modelos de Gemini a intentar en orden de preferencia según la API v1beta
     models = [
-        "gemini-3.5-flash-lite",
-        "gemini-flash-latest",
-        "gemini-3.1-flash-lite",
         "gemini-3.5-flash",
+        "gemini-flash-latest",
         "gemini-pro-latest",
     ]
     last_error = None
@@ -249,6 +247,8 @@ def generar_con_gemini(req: GenerarRecursoRequest, api_key: str, pdf_base64: Opt
         )
     contents_parts.append({"text": prompt})
 
+    timeout_val = 90 if pdf_base64 else 45
+
     for model_name in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         payload = {
@@ -263,41 +263,48 @@ def generar_con_gemini(req: GenerarRecursoRequest, api_key: str, pdf_base64: Opt
             }
         }
         data_bytes = json.dumps(payload).encode("utf-8")
-        req_obj = urllib.request.Request(
-            url,
-            data=data_bytes,
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-        try:
-            with urllib.request.urlopen(req_obj, timeout=40) as response:
-                resp_json = json.loads(response.read().decode("utf-8"))
-                text_out = resp_json["candidates"][0]["content"]["parts"][0]["text"]
-                # Limpiar posibles delimitadores de código si el modelo los incluyó
-                text_clean = text_out.strip()
-                if text_clean.startswith("```json"):
-                    text_clean = text_clean[7:]
-                elif text_clean.startswith("```"):
-                    text_clean = text_clean[3:]
-                if text_clean.endswith("```"):
-                    text_clean = text_clean[:-3]
-                text_clean = text_clean.strip()
-                return json.loads(text_clean)
-        except urllib.error.HTTPError as he:
-            err_body = he.read().decode("utf-8", errors="ignore")
-            print(f"[Gemini API Error] {model_name} HTTP {he.code}: {err_body}")
-            last_error = f"HTTP {he.code}: {err_body}"
 
-            if he.code in (404, 429, 503) or "high demand" in err_body.lower() or "unavailable" in err_body.lower():
-                had_high_demand = True
-                continue
-            continue
-        except urllib.error.URLError as ue:
-            print(f"[Gemini Network Error] {model_name}: {ue}")
-            last_error = str(ue)
-            continue
-        except Exception as e:
-            print(f"[Gemini Parse Error] {model_name}: {e}")
+        # Intentar hasta 2 veces por modelo ante picos transitorios 503
+        for intento in range(2):
+            req_obj = urllib.request.Request(
+                url,
+                data=data_bytes,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req_obj, timeout=timeout_val) as response:
+                    resp_json = json.loads(response.read().decode("utf-8"))
+                    text_out = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+                    text_clean = text_out.strip()
+                    if text_clean.startswith("```json"):
+                        text_clean = text_clean[7:]
+                    elif text_clean.startswith("```"):
+                        text_clean = text_clean[3:]
+                    if text_clean.endswith("```"):
+                        text_clean = text_clean[:-3]
+                    text_clean = text_clean.strip()
+                    return json.loads(text_clean)
+            except urllib.error.HTTPError as he:
+                err_body = he.read().decode("utf-8", errors="ignore")
+                print(f"[Gemini API Error] {model_name} (intento {intento + 1}) HTTP {he.code}: {err_body}")
+                last_error = f"HTTP {he.code}: {err_body}"
+
+                if he.code == 503 and intento == 0:
+                    time.sleep(2.0)
+                    continue
+                if he.code in (404, 429, 503) or "high demand" in err_body.lower() or "unavailable" in err_body.lower():
+                    had_high_demand = True
+                    break
+                break
+            except urllib.error.URLError as ue:
+                print(f"[Gemini Network Error] {model_name}: {ue}")
+                last_error = str(ue)
+                break
+            except Exception as e:
+                print(f"[Gemini Parse Error] {model_name}: {e}")
+                last_error = str(e)
+                break
             last_error = str(e)
             continue
 
