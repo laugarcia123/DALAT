@@ -250,6 +250,16 @@ export default function RepositoryTab({
   const [showFormatDropdown, setShowFormatDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Modal de confirmación moderno para eliminar (reemplaza confirm() nativo del navegador)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: "equipo" | "documento";
+    id: number;
+    name: string;
+    materia?: string;
+    count?: number;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Form State Equipo
   const [equipoNombre, setEquipoNombre] = useState("");
   const [equipoMateria, setEquipoMateria] = useState("General");
@@ -527,24 +537,18 @@ export default function RepositoryTab({
   };
 
   // ========================================================
-  // ELIMINAR EQUIPO
+  // ELIMINAR EQUIPO (ABRIR MODAL ELEGANTE)
   // ========================================================
-  const handleDeleteEquipo = async (id_equipo: number, e?: React.MouseEvent) => {
+  const handleDeleteEquipo = (id_equipo: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!confirm("¿Estás seguro de eliminar este repositorio y todos sus materiales?")) return;
-
-    setEquipos((prev) => prev.filter((eq) => eq.id_equipo !== id_equipo));
-    if (viewingEquipoId === id_equipo) {
-      setViewingEquipoId(null);
-    }
-
-    if (isAuthenticated) {
-      try {
-        await repositoryService.deleteEquipo(id_equipo);
-      } catch (err) {
-        console.error("Error al eliminar equipo en backend:", err);
-      }
-    }
+    const team = equipos.find((eq) => eq.id_equipo === id_equipo);
+    setDeleteTarget({
+      type: "equipo",
+      id: id_equipo,
+      name: team?.nombre || "este repositorio",
+      materia: team?.materia,
+      count: team?.documentos_count ?? team?.documentos?.length ?? 0,
+    });
   };
 
   // ========================================================
@@ -693,35 +697,68 @@ export default function RepositoryTab({
   };
 
   // ========================================================
-  // ELIMINAR DOCUMENTO
+  // ELIMINAR DOCUMENTO (ABRIR MODAL ELEGANTE)
   // ========================================================
-  const handleDeleteDocumento = async (id_documento: number, e: React.MouseEvent) => {
+  const handleDeleteDocumento = (id_documento: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("¿Eliminar este documento del repositorio?")) return;
+    const doc = (viewingEquipo?.documentos || []).find((d) => d.id_documento === id_documento);
+    setDeleteTarget({
+      type: "documento",
+      id: id_documento,
+      name: doc?.nombre || "este archivo",
+    });
+  };
 
-    setEquipos((prev) =>
-      prev.map((eq) => {
-        if (eq.id_equipo === viewingEquipo?.id_equipo) {
-          const updatedDocs = (eq.documentos || []).filter(
-            (d) => d.id_documento !== id_documento
-          );
-          return {
-            ...eq,
-            documentos: updatedDocs,
-            documentos_count: updatedDocs.length,
-          };
+  // ========================================================
+  // EJECUCIÓN CONFIRMADA DE ELIMINACIÓN
+  // ========================================================
+  const confirmExecuteDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+
+    try {
+      if (deleteTarget.type === "equipo") {
+        const id_equipo = deleteTarget.id;
+        setEquipos((prev) => prev.filter((eq) => eq.id_equipo !== id_equipo));
+        if (viewingEquipoId === id_equipo) {
+          setViewingEquipoId(null);
         }
-        return eq;
-      })
-    );
-
-    if (isAuthenticated) {
-      try {
-        await repositoryService.deleteDocumento(id_documento);
-        await loadQuota();
-      } catch (err) {
-        console.error("Error al eliminar documento en backend:", err);
+        if (isAuthenticated) {
+          try {
+            await repositoryService.deleteEquipo(id_equipo);
+          } catch (err) {
+            console.error("Error al eliminar equipo en backend:", err);
+          }
+        }
+      } else {
+        const id_documento = deleteTarget.id;
+        setEquipos((prev) =>
+          prev.map((eq) => {
+            if (eq.id_equipo === viewingEquipo?.id_equipo) {
+              const updatedDocs = (eq.documentos || []).filter(
+                (d) => d.id_documento !== id_documento
+              );
+              return {
+                ...eq,
+                documentos: updatedDocs,
+                documentos_count: updatedDocs.length,
+              };
+            }
+            return eq;
+          })
+        );
+        if (isAuthenticated) {
+          try {
+            await repositoryService.deleteDocumento(id_documento);
+            await loadQuota();
+          } catch (err) {
+            console.error("Error al eliminar documento en backend:", err);
+          }
+        }
       }
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -1296,32 +1333,48 @@ export default function RepositoryTab({
                 </div>
               </div>
 
-              {/* Botón Destacado de Copiar Enlace de Invitación */}
-              {!viewingEquipo.es_personal && (
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                {/* Botón Destacado de Copiar Enlace de Invitación */}
+                {!viewingEquipo.es_personal && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyLink(viewingEquipo)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer shrink-0 ${
+                      copiedEquipoId === viewingEquipo.id_equipo
+                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
+                        : activeLight
+                        ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm"
+                        : "bg-[#09221c] hover:bg-[#0e2e26] text-emerald-400 border border-[#14473c]"
+                    }`}
+                  >
+                    {copiedEquipoId === viewingEquipo.id_equipo ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>¡Enlace copiado al portapapeles!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span>Copiar enlace de invitación</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => handleCopyLink(viewingEquipo)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer shrink-0 ${
-                    copiedEquipoId === viewingEquipo.id_equipo
-                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
-                      : activeLight
-                      ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm"
-                      : "bg-[#09221c] hover:bg-[#0e2e26] text-emerald-400 border border-[#14473c]"
+                  onClick={() => handleDeleteEquipo(viewingEquipo.id_equipo)}
+                  title="Eliminar este repositorio"
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer shrink-0 ${
+                    activeLight
+                      ? "text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200"
+                      : "text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 border border-[#232945]"
                   }`}
                 >
-                  {copiedEquipoId === viewingEquipo.id_equipo ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>¡Enlace copiado al portapapeles!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      <span>Copiar enlace de invitación</span>
-                    </>
-                  )}
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Eliminar</span>
                 </button>
-              )}
+              </div>
             </div>
 
             {/* Materiales Title & Count */}
@@ -1990,6 +2043,114 @@ export default function RepositoryTab({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL DE CONFIRMACIÓN MODERNO (REPOSITORIO / DOCUMENTO)  */}
+      {/* ======================================================== */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => !isDeleting && setDeleteTarget(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-md rounded-3xl p-6 sm:p-7 relative overflow-hidden shadow-2xl transition-all border animate-in zoom-in-95 duration-200 ${
+              activeLight
+                ? "bg-white/95 border-slate-200/90 text-slate-900 shadow-rose-950/10"
+                : "bg-[#0d1020] border-[#222846] text-white shadow-2xl shadow-rose-950/20"
+            }`}
+          >
+            {/* Ambient Red Glow in Top */}
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => !isDeleting && setDeleteTarget(null)}
+              disabled={isDeleting}
+              className={`absolute top-4 right-4 p-1.5 rounded-xl transition cursor-pointer ${
+                activeLight
+                  ? "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.06]"
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Trash / Warning Badge */}
+            <div className="relative mx-auto mb-4 w-14 h-14 rounded-2xl bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 shadow-sm shadow-rose-500/20">
+              <Trash2 className="w-7 h-7 stroke-[2.2]" />
+            </div>
+
+            {/* Title & Info */}
+            <div className="text-center space-y-2">
+              <h3 className={`text-lg sm:text-xl font-bold tracking-tight ${activeLight ? "text-slate-900" : "text-white"}`}>
+                {deleteTarget.type === "equipo"
+                  ? "¿Eliminar este repositorio?"
+                  : "¿Eliminar este archivo?"}
+              </h3>
+
+              {/* Tag with the item name */}
+              <div className="inline-flex items-center gap-2 max-w-full px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40 text-xs font-semibold text-rose-700 dark:text-rose-300">
+                {deleteTarget.type === "equipo" ? (
+                  <Folder className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                )}
+                <span className="truncate max-w-[240px] sm:max-w-[280px]">
+                  {deleteTarget.name}
+                </span>
+              </div>
+
+              {/* Description */}
+              <p className={`text-xs leading-relaxed max-w-sm mx-auto pt-1 ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
+                {deleteTarget.type === "equipo"
+                  ? "Esta acción es definitiva e irreversible. Se eliminarán permanentemente todos los apuntes, resúmenes y materiales que contiene este repositorio."
+                  : "Este material se eliminará de forma permanente de tu repositorio y no podrás recuperarlo."}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 pt-6 mt-4 border-t border-slate-100 dark:border-[#1a2038]">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer ${
+                  activeLight
+                    ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    : "bg-[#161a30] hover:bg-[#1e2342] text-slate-300 border border-[#252c4b]"
+                }`}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmExecuteDelete}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-500 via-rose-600 to-red-600 hover:from-rose-600 hover:to-red-700 text-white text-xs font-semibold shadow-lg shadow-rose-500/25 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>
+                      {deleteTarget.type === "equipo"
+                        ? "Sí, eliminar repositorio"
+                        : "Sí, eliminar archivo"}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
