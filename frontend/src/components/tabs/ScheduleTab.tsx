@@ -109,75 +109,14 @@ const SESSION_TYPES = [
   { id: "tutoria", label: "Tutoría", icon: User },
 ];
 
-const DEFAULT_LOCAL_SCHEDULE: ScheduleBackendItem[] = [
-  {
-    id_horario: 1,
-    id_usuario: 1,
-    titulo: "Cálculo Multivariable",
-    dia_semana: 3,
-    hora_inicio: "07:30",
-    hora_fin: "09:00",
-    duracion_minutos: 90,
-    lugar: "Aula 204",
-    color: "#7c3aed",
-    tipo: "clase",
-  },
-  {
-    id_horario: 2,
-    id_usuario: 1,
-    titulo: "Arquitectura de Software",
-    dia_semana: 3,
-    hora_inicio: "10:00",
-    hora_fin: "11:30",
-    duracion_minutos: 90,
-    lugar: "Sala Virtual",
-    color: "#f59e0b",
-    tipo: "clase",
-  },
-  {
-    id_horario: 3,
-    id_usuario: 1,
-    titulo: "Examen Parcial 1: Algoritmos",
-    dia_semana: 3,
-    hora_inicio: "13:00",
-    hora_fin: "14:30",
-    duracion_minutos: 90,
-    lugar: "Laboratorio Central 2",
-    color: "#ef4444",
-    tipo: "examen",
-  },
-  {
-    id_horario: 4,
-    id_usuario: 1,
-    titulo: "Laboratorio de Redes",
-    dia_semana: 3,
-    hora_inicio: "16:00",
-    hora_fin: "17:30",
-    duracion_minutos: 90,
-    lugar: "Lab Redes 1",
-    color: "#10b981",
-    tipo: "laboratorio",
-  },
-  {
-    id_horario: 5,
-    id_usuario: 1,
-    titulo: "Simulación de Examen & Repaso",
-    dia_semana: 7,
-    hora_inicio: "18:00",
-    hora_fin: "19:30",
-    duracion_minutos: 90,
-    lugar: "Espacio Dalat",
-    color: "#ec4899",
-    tipo: "examen",
-  },
-];
+const DEFAULT_LOCAL_SCHEDULE: ScheduleBackendItem[] = [];
 
 interface ScheduleTabProps {
   isLightMode?: boolean;
 }
 
 export default function ScheduleTab({ isLightMode = false }: ScheduleTabProps) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [viewMode, setViewMode] = useState<"dia" | "semana">("dia");
 
   // Determinar el día de hoy (1 = Lunes, ..., 7 = Domingo)
@@ -245,25 +184,30 @@ export default function ScheduleTab({ isLightMode = false }: ScheduleTabProps) {
 
   // Cargar horario real desde el backend
   const loadSchedule = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user) {
+      setScheduleItems([]);
+      return;
+    }
     try {
       setLoading(true);
       const data = await scheduleService.getSchedule();
-      if (data && data.length > 0) {
+      if (data && Array.isArray(data)) {
         setScheduleItems(data);
+      } else {
+        setScheduleItems([]);
       }
     } catch (err) {
-      console.warn("No se pudo cargar el horario del backend, usando datos locales:", err);
+      console.warn("No se pudo cargar el horario del backend:", err);
+      setScheduleItems([]);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      loadSchedule();
-    });
-  }, [loadSchedule]);
+    setScheduleItems([]);
+    loadSchedule();
+  }, [user, isAuthenticated, loadSchedule]);
 
   // Manejar creación de clase con soporte de múltiples días
   const handleCreateClass = async (e: React.FormEvent) => {

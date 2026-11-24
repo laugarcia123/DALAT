@@ -41,6 +41,6 @@ class GenerarRecursoResponse(BaseModel):
     materia: str
     tema: str
     dificultad: str
-    fuente: str  # cache, gemini, groq, openrouter, heuristico_local
+    fuente: str  # gemini, groq, openrouter, heuristico_local
     tiempo_generacion_ms: int
     contenido: Any

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   FileText,
   Sparkles,
@@ -20,12 +20,28 @@ import {
   Layers,
   Trash2,
   Loader2,
-  Paperclip,
   Lock,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  Folder,
+  Users,
+  Search,
+  X,
+  Link2,
+  FileArchive,
+  Package,
+  Download,
 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { exportExamToPDF, exportFlashcardsToPDF } from "@/lib/pdfExport";
+import StudyGuideRenderer from "./StudyGuideRenderer";
+import { useAuth } from "@/context/AuthContext";
 import { flashcardStorage } from "@/services/flashcardStorage";
+import {
+  repositoryService,
+  DocumentoItem,
+  EquipoItem,
+} from "@/services/repositoryService";
 import {
   aiService,
   GenerarRecursoResponse,
@@ -35,37 +51,16 @@ import {
 
 interface MaterialFile {
   id: string;
+  backendDocId?: number;
   name: string;
   subject: string;
   size: string;
-  type: "pdf" | "docx" | "txt";
+  type: "pdf" | "docx" | "txt" | "ppt" | "link" | "zip";
+  isLink?: boolean;
+  isArchive?: boolean;
   isLocal?: boolean;
   previewText?: string;
 }
-
-const INITIAL_FILES: MaterialFile[] = [
-  {
-    id: "f1",
-    name: "Unidad 3 — Integrales múltiples.pdf",
-    subject: "Cálculo III",
-    size: "2.7 MB",
-    type: "pdf",
-  },
-  {
-    id: "f2",
-    name: "Notas de clase — Microeconomía.docx",
-    subject: "Economía",
-    size: "898 KB",
-    type: "docx",
-  },
-  {
-    id: "f3",
-    name: "Guía 2 — Leyes de Newton y Energía.pdf",
-    subject: "Física Mecánica",
-    size: "1.4 MB",
-    type: "pdf",
-  },
-];
 
 interface AiResourcesTabProps {
   isLightMode?: boolean;
@@ -73,6 +68,7 @@ interface AiResourcesTabProps {
   onGoToCheckout?: () => void;
   tokensBalance?: number;
   onDeductTokens?: (amount: number) => void;
+  onNavigateToRepository?: () => void;
 }
 
 export type EngineOptionId = "opcion_1" | "opcion_2";
@@ -102,10 +98,21 @@ const OPTIMIZATION_OPTIONS: OptimizationOption[] = [
   },
 ];
 
+export type ResourceType =
+  | "Examen"
+  | "Flashcards"
+  | "Resumen"
+  | "Guia"
+  | "Pack_General"
+  | "Pack_Matematicas";
+
 export function calculateTokenCost(
-  resourceType: "Examen" | "Flashcards" | "Resumen" | "Guia",
+  resourceType: ResourceType,
   engineOption: EngineOptionId
 ): number {
+  if (resourceType === "Pack_General") return 2; // Pack 1 (Examen + Flashcards + Resumen): 2 tokens (Ahorras 1 token)
+  if (resourceType === "Pack_Matematicas") return 7; // Pack 2 (Guía + Resumen + Examen Opción 2): 7 tokens (Ahorras 3 tokens)
+
   if (engineOption === "opcion_1") {
     // Opción 1: Exámenes (1), Flashcards (1), Resúmenes (1), Guía solo en Opción 2
     if (resourceType === "Examen") return 1;
@@ -122,12 +129,73 @@ export function calculateTokenCost(
   }
 }
 
+const getDemoPreviewContent = (type: string): any => {
+  if (type === "Examen") {
+    return [
+      {
+        id: 1,
+        pregunta: "¿Qué condición garantiza el Teorema de Fubini para intercambiar el orden de integración en una integral doble?",
+        opciones: [
+          "Que la función integrando f(x,y) sea continua en la región rectangular de integración.",
+          "Que la región sea un círculo unitario centrado en el origen.",
+          "Que las derivadas parciales de segundo orden sean idénticamente nulas.",
+          "Que la función no dependa de la variable x."
+        ],
+        indice_correcto: 0,
+        explicacion: "El Teorema de Fubini afirma que si f(x,y) es continua en el rectángulo R = [a,b] x [c,d], la integral doble puede evaluarse mediante integrales iteradas en cualquiera de los dos órdenes."
+      }
+    ];
+  }
+  if (type === "Flashcards") {
+    return [
+      {
+        id: 1,
+        anverso: "¿Qué es y cómo se aplica el Teorema de Fubini?",
+        reverso: "Permite calcular integrales dobles mediante integrales iteradas en cualquier orden si f(x,y) es continua.",
+        categoria: "Cálculo Multivariable",
+        dificultad: "Intermedio"
+      }
+    ];
+  }
+  if (type === "Pack_General") {
+    return {
+      examen: getDemoPreviewContent("Examen"),
+      flashcards: getDemoPreviewContent("Flashcards"),
+      resumen: getDemoPreviewContent("Resumen"),
+    };
+  }
+  if (type === "Pack_Matematicas") {
+    return {
+      guia: {
+        titulo: "Guía de Estudio Paso a Paso: Análisis Matemático & Físico",
+        resumen_markdown: "# Ruta de Aprendizaje Feynman\n\n### Fase 1: Selección y Estudio Inicial\nIdentifica los conceptos cuantitativos fundamentales y las fórmulas base.\n\n### Fase 2: Explicación Simplificada\nExplica las ecuaciones con analogías físicas simples sin tecnicismos innecesarios.\n\n### Fase 3: Identificación de Brechas\nVerifica inconsistencias dimensionales y casos límite en los problemas.\n\n### Fase 4: Refinamiento y Analogía\nConecta los teoremas con aplicaciones prácticas de ingeniería y física.",
+        puntos_clave: ["Optimización cuantitativa", "Análisis dimensional", "Teoremas fundamentales"],
+        formulas_o_conceptos: ["Ecuación diferencial ordinaria", "Transformada de Laplace"]
+      },
+      resumen: {
+        titulo: "Resumen Académico con Fórmulas y Teoremas",
+        resumen_markdown: "# Resumen Teórico-Práctico Especializado\n\n## 1. Fundamentos Matemáticos\nEl estudio cuantitativo requiere rigor en la definición de límites y operadores.\n\n## 2. Ecuaciones Principales\nEcuación de balance y conservación.",
+        puntos_clave: ["Rigor matemático", "Demostraciones clave"],
+        formulas_o_conceptos: ["Ley de conservación", "Operador gradiente"]
+      },
+      examen: getDemoPreviewContent("Examen"),
+    };
+  }
+  return {
+    titulo: "Resumen Académico de Muestra PRO",
+    resumen_markdown: "# Resumen Académico PRO\n\nContenido exclusivo generado con modelos avanzados de inteligencia artificial.",
+    puntos_clave: ["Análisis multivariable", "Integración iterada"],
+    formulas_o_conceptos: ["Teorema de Fubini", "Jacobiano"]
+  };
+};
+
 export default function AiResourcesTab({
   isLightMode = false,
   isPro = false,
   onGoToCheckout,
   tokensBalance = 0,
   onDeductTokens,
+  onNavigateToRepository,
 }: AiResourcesTabProps) {
   // Sincronización reactiva del tema claro
   const [domIsLight, setDomIsLight] = useState<boolean>(() => {
@@ -167,27 +235,116 @@ export default function AiResourcesTab({
 
   const activeLight = Boolean(isLightMode || domIsLight);
 
-  const [files, setFiles] = useState<MaterialFile[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("dalat_ai_materials");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch {}
-    }
-    return INITIAL_FILES;
-  });
+  const { user, isAuthenticated } = useAuth();
+  const [files, setFiles] = useState<MaterialFile[]>([]);
+  const [selectedFileId, setSelectedFileId] = useState("");
+  const [equipos, setEquipos] = useState<EquipoItem[]>([]);
 
-  // Persistir materiales para uso compartido con Método Psicópata
-  React.useEffect(() => {
+  // Estados del Explorador de Repositorios (Nivel 1 y Nivel 2)
+  const [isRepoExplorerOpen, setIsRepoExplorerOpen] = useState(false);
+  const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
+  const [repoFilterTab, setRepoFilterTab] = useState<"equipos" | "personal">("equipos");
+  const [explorerSearch, setExplorerSearch] = useState("");
+
+  // Sincronizar materiales directamente con los repositorios en PostgreSQL
+  const loadRepositoryDocuments = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
-      localStorage.setItem("dalat_ai_materials", JSON.stringify(files));
-    } catch {}
-  }, [files]);
-  const [selectedFileId, setSelectedFileId] = useState("f1");
-  const [resourceType, setResourceType] = useState<"Examen" | "Flashcards" | "Resumen" | "Guia">("Examen");
+      const [docs, eqData] = await Promise.all([
+        repositoryService.getAllDocumentos(),
+        repositoryService.getEquipos(),
+      ]);
+
+      if (Array.isArray(eqData)) {
+        setEquipos(eqData);
+      }
+
+      if (docs && Array.isArray(docs)) {
+        const mapped: MaterialFile[] = docs.map((doc: DocumentoItem) => {
+          const fmt = (doc.formato || "").toUpperCase();
+          const docNameLower = doc.nombre.toLowerCase();
+          const isLink =
+            fmt === "LINK" ||
+            fmt === "NOTION" ||
+            doc.tamano === "Enlace" ||
+            Boolean(doc.url_recurso?.startsWith("http")) ||
+            docNameLower.startsWith("http");
+
+          const isArchive =
+            fmt === "ZIP" ||
+            fmt === "RAR" ||
+            fmt === "7Z" ||
+            fmt === "TAR" ||
+            fmt === "GZ" ||
+            fmt.includes("ZIP") ||
+            fmt.includes("RAR") ||
+            docNameLower.endsWith(".zip") ||
+            docNameLower.endsWith(".rar") ||
+            docNameLower.endsWith(".7z") ||
+            docNameLower.endsWith(".tar") ||
+            docNameLower.endsWith(".gz") ||
+            docNameLower.endsWith(".tgz");
+
+          const isDocx =
+            fmt.includes("DOC") ||
+            fmt.includes("WORD") ||
+            docNameLower.endsWith(".docx") ||
+            docNameLower.endsWith(".doc");
+
+          const isPpt =
+            fmt.includes("PPT") ||
+            docNameLower.endsWith(".pptx") ||
+            docNameLower.endsWith(".ppt");
+
+          const isTxt =
+            fmt.includes("TXT") ||
+            fmt.includes("MD") ||
+            docNameLower.endsWith(".txt") ||
+            docNameLower.endsWith(".md");
+
+          const ext: "pdf" | "docx" | "txt" | "ppt" | "link" | "zip" = isLink
+            ? "link"
+            : isArchive
+            ? "zip"
+            : isDocx
+            ? "docx"
+            : isTxt
+            ? "txt"
+            : isPpt
+            ? "ppt"
+            : "pdf";
+
+          return {
+            id: `doc_${doc.id_documento}`,
+            backendDocId: doc.id_documento,
+            name: doc.nombre,
+            subject: doc.descripcion || "Repositorio Académico",
+            size: doc.tamano || "1.0 MB",
+            type: ext,
+            isLink,
+            isArchive,
+            isLocal: false,
+            previewText: doc.descripcion || doc.nombre,
+          };
+        });
+
+        setFiles(mapped);
+        const playable = mapped.filter((m) => !m.isLink && !m.isArchive);
+        if (playable.length > 0) {
+          setSelectedFileId((prev) => (prev && playable.some((m) => m.id === prev) ? prev : playable[0].id));
+        }
+      }
+    } catch (err) {
+      console.warn("[AiResourcesTab] Error al sincronizar con repositorio:", err);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    loadRepositoryDocuments();
+  }, [loadRepositoryDocuments]);
+
+  const [resourceType, setResourceType] = useState<ResourceType>("Examen");
+  const [packActiveTab, setPackActiveTab] = useState<"examen" | "flashcards" | "resumen" | "guia">("examen");
   const [engineOption, setEngineOption] = useState<EngineOptionId>("opcion_1");
   const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
   const engineDropdownRef = useRef<HTMLDivElement>(null);
@@ -205,21 +362,19 @@ export default function AiResourcesTab({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // La Guía paso a paso solo tiene disponibilidad con la Opción 2
+  // La Guía paso a paso y el Pack 2 siempre usan Opción 2; el Pack 1 siempre usa Opción 1
   const effectiveEngineOption: EngineOptionId =
-    resourceType === "Guia" ? "opcion_2" : engineOption;
+    resourceType === "Pack_General"
+      ? "opcion_1"
+      : resourceType === "Pack_Matematicas" || resourceType === "Guia"
+      ? "opcion_2"
+      : engineOption;
 
   const currentTokenCost = calculateTokenCost(resourceType, effectiveEngineOption);
   const [questionCount, setQuestionCount] = useState(5);
   const maxQuestionCount = resourceType === "Examen" ? 8 : 15;
   const [generating, setGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Subida de archivos reales desde el ordenador
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [uploadingFile, setUploadingFile] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploadSuccessToast, setUploadSuccessToast] = useState<string | null>(null);
 
   // Recurso Activo Generado
   const [activeResource, setActiveResource] = useState<GenerarRecursoResponse | null>(null);
@@ -238,94 +393,33 @@ export default function AiResourcesTab({
   // Estado del Visor de Resumen / Guía
   const [copied, setCopied] = useState(false);
 
-  // Archivo seleccionado actualmente
-  const selectedFile = files.find((f) => f.id === selectedFileId) || files[0];
+  // Archivo seleccionado actualmente (con fallback seguro)
+  const selectedFile = files.find((f) => f.id === selectedFileId) || files[0] || {
+    id: "empty",
+    name: "Sin archivo seleccionado",
+    subject: "General",
+    size: "0 KB",
+    type: "pdf" as const,
+  };
 
-  // ==========================================
-  // PROCESAMIENTO DE ARCHIVO DEL ORDENADOR
-  // ==========================================
-  const handleFileProcess = async (file: File) => {
-    setUploadingFile(true);
-    setErrorMessage(null);
-
-    try {
-      const res = await aiService.subirMaterial(file);
-      const newFileItem: MaterialFile = {
-        id: res.id,
-        name: res.name,
-        subject: res.subject,
-        size: res.size,
-        type: (res.type as any) || "pdf",
-        isLocal: true,
-        previewText: res.preview_text,
-      };
-
-      setFiles((prev) => [newFileItem, ...prev]);
-      setSelectedFileId(newFileItem.id);
-      setActiveResource(null);
-      setUploadSuccessToast(`"${file.name}" cargado exitosamente desde tu ordenador`);
-      setTimeout(() => setUploadSuccessToast(null), 4000);
-      confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
-    } catch (err: any) {
-      console.warn("Subida a backend falló o sin red, procesando en navegador:", err);
-      // Fallback en navegador para que nunca falle
-      let preview = "";
-      if (file.type.includes("text") || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
-        try {
-          preview = await file.text();
-        } catch {}
-      }
-
-      const sizeStr =
-        file.size >= 1024 * 1024
-          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-          : `${Math.max(1, Math.round(file.size / 1024))} KB`;
-
-      const ext = file.name.split(".").pop()?.toLowerCase() || "pdf";
-      const newFileItem: MaterialFile = {
-        id: `f_local_${Date.now()}`,
-        name: file.name,
-        subject: "Materia General",
-        size: sizeStr,
-        type: ext === "docx" ? "docx" : ext === "txt" ? "txt" : "pdf",
-        isLocal: true,
-        previewText: preview.slice(0, 1000),
-      };
-
-      setFiles((prev) => [newFileItem, ...prev]);
-      setSelectedFileId(newFileItem.id);
-      setActiveResource(null);
-      setUploadSuccessToast(`"${file.name}" cargado exitosamente`);
-      setTimeout(() => setUploadSuccessToast(null), 4000);
-      confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
-    } finally {
-      setUploadingFile(false);
-      setIsDragging(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+  const handleDeleteFile = async (fileId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const target = files.find((f) => f.id === fileId);
+    if (target?.backendDocId && isAuthenticated) {
+      try {
+        await repositoryService.deleteDocumento(target.backendDocId);
+        await loadRepositoryDocuments();
+      } catch (err) {
+        console.warn("Error al eliminar del repositorio:", err);
       }
     }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileProcess(file);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFileProcess(file);
-  };
-
-  const handleDeleteFile = (fileId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
     setFiles((prev) => prev.filter((f) => f.id !== fileId));
     if (selectedFileId === fileId) {
       const remaining = files.filter((f) => f.id !== fileId);
       if (remaining.length > 0) {
         setSelectedFileId(remaining[0].id);
+      } else {
+        setSelectedFileId("");
       }
     }
   };
@@ -334,6 +428,26 @@ export default function AiResourcesTab({
   // DISPARADOR DE GENERACIÓN RESILIENTE
   // ==========================================
   const handleGenerate = async () => {
+    // Si el usuario es de la capa gratuita, mostrar la vista previa demo de fondo con el banner PRO
+    if (!isPro) {
+      setGenerating(true);
+      setErrorMessage(null);
+      setTimeout(() => {
+        setActiveResource({
+          id_recurso: "demo_preview_pro",
+          tipo_recurso: resourceType,
+          materia: selectedFile.subject || "Cálculo Multivariable",
+          tema: selectedFile.name ? selectedFile.name.replace(/\.(pdf|docx|txt|md|pptx)$/i, "") : "Simulacro de Examen PRO",
+          dificultad: "Intermedio",
+          fuente: "gemini",
+          tiempo_generacion_ms: 0,
+          contenido: getDemoPreviewContent(resourceType),
+        });
+        setGenerating(false);
+      }, 350);
+      return;
+    }
+
     if (isPro && tokensBalance < currentTokenCost) {
       setErrorMessage(
         `Tokens insuficientes. Esta generación requiere ${currentTokenCost} ${
@@ -361,6 +475,11 @@ export default function AiResourcesTab({
       });
 
       setActiveResource(res);
+      if (res.tipo_recurso === "Pack_Matematicas") {
+        setPackActiveTab("guia");
+      } else if (res.tipo_recurso === "Pack_General") {
+        setPackActiveTab("examen");
+      }
 
       if (isPro && onDeductTokens) {
         onDeductTokens(currentTokenCost);
@@ -387,10 +506,23 @@ export default function AiResourcesTab({
       setIsFlipped(false);
       setMasteredCards(new Set());
     } catch (err: any) {
-      console.error("[AI Tab] Error:", err);
-      setErrorMessage(
-        "No se pudo completar la generación. Verifica que el servidor de Dalat esté encendido."
-      );
+      const rawMsg = err?.message || String(err || "");
+      if (
+        rawMsg.includes("503") ||
+        rawMsg.includes("502") ||
+        rawMsg.includes("UNAVAILABLE") ||
+        rawMsg.toLowerCase().includes("high demand") ||
+        rawMsg.toLowerCase().includes("demandados") ||
+        rawMsg.toLowerCase().includes("alta demanda")
+      ) {
+        setErrorMessage(
+          "Nuestros recursos PRO están altamente demandados en este momento. Por favor, intenta más tarde."
+        );
+      } else {
+        setErrorMessage(
+          rawMsg || "No se pudo completar la generación. Verifica que la API Key de Gemini esté configurada en backend/.env."
+        );
+      }
     } finally {
       setGenerating(false);
     }
@@ -448,15 +580,6 @@ export default function AiResourcesTab({
         <p className={`text-xs sm:text-sm font-medium ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
           Transforma apuntes en exámenes prácticos, flashcards activas y guías paso a paso.
         </p>
-
-        {/* Hidden File Input para abrir explorador de archivos desde la zona de arrastre */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleFileSelect}
-          accept=".pdf,.docx,.doc,.txt,.md,.pptx"
-          className="hidden"
-        />
       </div>
 
       {/* Main Studio Card */}
@@ -464,113 +587,152 @@ export default function AiResourcesTab({
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
           
-          {/* Left Column: Lista de Materiales y Zona de Carga */}
+          {/* Left Column: Selección de Documentos desde el Repositorio */}
           <div className="lg:col-span-5 space-y-4">
-            <div className={`flex items-center justify-between pb-1 border-b ${activeLight ? "border-slate-100" : "border-[#171c30]"}`}>
-
-              <h3 className={`font-bold text-sm ${activeLight ? "text-slate-900" : "text-white"}`}>Material de Estudio</h3>
-
-              <span className={`text-xs font-medium ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
-
-                {files.length} apuntes
-              </span>
-            </div>
-
-            {/* Zona Drag & Drop para subir archivos directamente */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              className={`border border-dashed rounded-xl p-3.5 text-center cursor-pointer transition select-none ${
-                isDragging
-                  ? "border-purple-400 bg-purple-500/10 scale-[1.01]"
-                  : activeLight
-                  ? "border-purple-200 bg-purple-50/40 hover:bg-purple-50/80 hover:border-purple-300"
-                  : "border-[#222845] bg-[#090b14] hover:border-indigo-500/50 hover:bg-[#0e1122]"
-              }`}
-            >
-              <div className={`flex items-center justify-center gap-2 text-xs font-semibold ${activeLight ? "text-purple-700" : "text-indigo-300"}`}>
-
-                {uploadingFile ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                ) : (
-                  <Paperclip className="w-4 h-4 text-indigo-400" />
-                )}
-                <span>
-                  {uploadingFile
-                    ? "Procesando archivo..."
-                    : isDragging
-                    ? "¡Suelta el archivo aquí!"
-                    : "Haz clic o arrastra un archivo desde tu PC"}
+            <div className={`pb-2 border-b ${activeLight ? "border-slate-100" : "border-[#171c30]"}`}>
+              <div className="flex items-center gap-2">
+                <h3 className={`font-bold text-sm ${activeLight ? "text-slate-900" : "text-white"}`}>Documentos del Repositorio</h3>
+                <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                  Recientes
                 </span>
               </div>
-              <p className="text-[10px] text-slate-500 mt-1">
-                Soporta PDF, Word (DOCX), Texto (TXT, MD)
-              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Mostrando los 3 documentos más recientes de tus repositorios</p>
             </div>
 
-            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-              {files.map((file) => {
-                const isSelected = selectedFileId === file.id;
-                return (
-                  <div
-                    key={file.id}
-                    onClick={() => {
-                      setSelectedFileId(file.id);
-                      setActiveResource(null);
-                    }}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 relative overflow-hidden group ${
-                      isSelected
-                        ? activeLight
-                          ? "bg-purple-50/80 border-purple-300 shadow-xs ring-1 ring-purple-200"
-                          : "bg-[#111425] border-[#222845] shadow-md shadow-[#7c5dfa]/5"
-                        : activeLight
-                        ? "bg-slate-50/70 border-slate-200/80 hover:bg-slate-100/80"
-                        : "bg-[#090b14] border-[#161a2b] hover:bg-[#0e1120]"
-                    }`}
-                  >
-                    {isSelected && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#7c5dfa]"></div>
-                    )}
+            {/* Contenedor con las 3 tarjetas de documentos recientes */}
+            <div className="space-y-2.5">
+              {(() => {
+                const playableDocs = files.filter((f) => !f.isLink && !f.isArchive);
+                let displayedRecentFiles = playableDocs.slice(0, 3);
+                if (selectedFileId && !displayedRecentFiles.some((f) => f.id === selectedFileId)) {
+                  const chosen = playableDocs.find((f) => f.id === selectedFileId);
+                  if (chosen) {
+                    displayedRecentFiles = [chosen, ...displayedRecentFiles.slice(0, 2)];
+                  }
+                }
 
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${activeLight ? "bg-purple-100 text-purple-700 border-purple-200" : "bg-[#181d33] text-indigo-300 border-transparent"}`}>
-                        <FileText className="w-4 h-4" />
+                if (playableDocs.length === 0) {
+                  return (
+                    <div className="p-8 rounded-2xl border border-dashed border-white/10 text-center space-y-3 text-slate-500 text-xs">
+                      <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
+                        <Folder className="w-6 h-6" />
                       </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className={`text-xs sm:text-sm font-bold truncate max-w-[180px] ${activeLight ? "text-slate-900" : "text-white"}`}>
-
-                            {file.name}
-                          </h4>
-                          {file.isLocal && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 shrink-0">
-                              Tu PC
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                          {file.subject} &bull; {file.size}
+                      <div className="space-y-1">
+                        <p className="font-semibold text-slate-200 text-sm">No tienes documentos en tu Repositorio aún</p>
+                        <p className="text-[11px] text-slate-400 max-w-[280px] mx-auto">
+                          Sube tus guías o apuntes en la pestaña Repositorio para poder utilizarlos con el generador de IA.
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsRepoExplorerOpen(true)}
+                        className="inline-flex items-center gap-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-xl transition shadow-md shadow-purple-600/20 cursor-pointer"
+                      >
+                        <Folder className="w-3.5 h-3.5" />
+                        <span>Explorar Repositorios</span>
+                      </button>
                     </div>
+                  );
+                }
 
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteFile(file.id, e)}
-                      title="Eliminar este apunte de la lista"
-                      className={`p-1.5 rounded-lg transition opacity-60 group-hover:opacity-100 shrink-0 cursor-pointer ${activeLight ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" : "text-slate-500 hover:text-rose-400 hover:bg-rose-950/30"}`}
+                return displayedRecentFiles.map((file) => {
+                  const isSelected = selectedFileId === file.id;
+
+                  return (
+                    <div
+                      key={file.id}
+                      onClick={() => {
+                        setSelectedFileId(file.id);
+                        setActiveResource(null);
+                      }}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 relative overflow-hidden group select-none ${
+                        isSelected
+                          ? activeLight
+                            ? "bg-purple-50/80 border-purple-400 ring-2 ring-purple-400/30 shadow-sm"
+                            : "bg-[#111425] border-purple-500 ring-2 ring-purple-500/30 shadow-md shadow-[#7c5dfa]/5"
+                          : activeLight
+                          ? "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 hover:border-slate-300 shadow-sm"
+                          : "bg-[#090b14] border-[#161a2b] hover:bg-[#0e1120] text-slate-300"
+                      }`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
+                      {isSelected && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#7c5dfa]"></div>
+                      )}
+
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span
+                          className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 ${
+                            file.type === "pdf"
+                              ? "bg-rose-500/15 text-rose-600 border border-rose-500/25"
+                              : file.type === "docx"
+                              ? "bg-blue-500/15 text-blue-600 border border-blue-500/25"
+                              : file.type === "ppt"
+                              ? "bg-amber-500/15 text-amber-600 border border-amber-500/25"
+                              : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25"
+                          }`}
+                        >
+                          {file.type.toUpperCase()}
+                        </span>
+
+                        <div className="min-w-0 flex-1">
+                          <h4 className={`text-xs sm:text-sm font-bold truncate ${activeLight ? "text-slate-900" : "text-white"}`} title={file.name}>
+                            {file.name}
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                            {file.subject} &bull; {file.size}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isSelected ? (
+                          <div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        ) : (
+                          <div
+                            className={`w-4 h-4 rounded-full border shrink-0 ${
+                              activeLight ? "border-slate-300" : "border-slate-700"
+                            }`}
+                          />
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteFile(file.id, e)}
+                          title="Eliminar este apunte de la lista"
+                          className={`p-1.5 rounded-lg transition opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer ${
+                            activeLight
+                              ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              : "text-slate-500 hover:text-rose-400 hover:bg-rose-950/30"
+                          }`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Detalle del archivo seleccionado y botón para abrir todos (mismo que en método psicópata) */}
+            <div className="flex items-center justify-between text-xs px-1 text-slate-400 pt-1">
+              <span className="truncate max-w-[190px] sm:max-w-[240px]">
+                Seleccionado:{" "}
+                <span className={`font-semibold ${activeLight ? "text-slate-800" : "text-slate-200"}`}>
+                  {selectedFile?.name || "Ninguno"}
+                </span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setIsRepoExplorerOpen(true)}
+                className="text-purple-600 dark:text-purple-400 hover:text-purple-500 font-semibold text-xs inline-flex items-center gap-1 hover:underline cursor-pointer shrink-0"
+              >
+                <span>Explorar repositorios ({equipos.reduce((acc, eq) => acc + (eq.documentos?.length || eq.documentos_count || 0), 0) || files.length})</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 
@@ -605,36 +767,127 @@ export default function AiResourcesTab({
               )}
             </div>
 
-            {/* Selector de Formato */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {(["Examen", "Flashcards", "Resumen", "Guia"] as const).map((fmt) => (
+            {/* Selector de Formato Individual */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Formatos Individuales</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(["Examen", "Flashcards", "Resumen", "Guia"] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    onClick={() => {
+                      setResourceType(fmt);
+                      setActiveResource(null);
+                      if (fmt === "Guia") {
+                        setEngineOption("opcion_2");
+                      }
+                      if (fmt === "Examen" && questionCount > 8) {
+                        setQuestionCount(8);
+                      }
+                    }}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                      resourceType === fmt
+                        ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/20 font-bold ring-1 ring-purple-400/50"
+                        : activeLight
+                        ? "bg-slate-50 hover:bg-slate-100 border border-slate-200/90 text-slate-700 hover:text-slate-900 shadow-2xs"
+                        : "bg-[#101324] border border-[#1e243d] text-slate-300 hover:text-white hover:bg-[#14182d]"
+                    }`}
+                  >
+                    {fmt === "Examen" && <HelpCircle className="w-3.5 h-3.5" />}
+                    {fmt === "Flashcards" && <Layers className="w-3.5 h-3.5" />}
+                    {fmt === "Resumen" && <FileText className="w-3.5 h-3.5" />}
+                    {fmt === "Guia" && <BookOpen className="w-3.5 h-3.5" />}
+                    <span>{fmt === "Guia" ? "Guía" : fmt}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Selector de Packs con Ahorro de Tokens */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider">
+                <span className={`flex items-center gap-1.5 ${activeLight ? "text-purple-800" : "text-purple-400"}`}>
+                  <Package className="w-3.5 h-3.5" />
+                  <span>Packs de Estudio con Ahorro de Tokens</span>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Pack 1: General */}
                 <button
-                  key={fmt}
+                  type="button"
                   onClick={() => {
-                    setResourceType(fmt);
+                    setResourceType("Pack_General");
+                    setEngineOption("opcion_1");
                     setActiveResource(null);
-                    if (fmt === "Guia") {
-                      setEngineOption("opcion_2");
-                    }
-                    if (fmt === "Examen" && questionCount > 8) {
-                      setQuestionCount(8);
-                    }
+                    setPackActiveTab("examen");
                   }}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer select-none ${
-                    resourceType === fmt
-                      ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/20 font-bold ring-1 ring-purple-400/50"
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden select-none ${
+                    resourceType === "Pack_General"
+                      ? activeLight
+                        ? "bg-purple-50/90 border-purple-600 ring-2 ring-purple-500/40 shadow-md shadow-purple-900/10"
+                        : "bg-gradient-to-br from-purple-600/20 via-indigo-600/15 to-transparent border-purple-500 ring-2 ring-purple-500/40 shadow-lg shadow-purple-950/30"
                       : activeLight
-                      ? "bg-slate-50 hover:bg-slate-100 border border-slate-200/90 text-slate-700 hover:text-slate-900 shadow-2xs"
-                      : "bg-[#101324] border border-[#1e243d] text-slate-300 hover:text-white hover:bg-[#14182d]"
+                      ? "bg-white hover:bg-purple-50/50 border-slate-200 hover:border-purple-300 text-slate-800 shadow-2xs"
+                      : "bg-[#0c0f20] hover:bg-[#131732] border-[#1f2647] text-slate-200"
                   }`}
                 >
-                  {fmt === "Examen" && <HelpCircle className="w-3.5 h-3.5" />}
-                  {fmt === "Flashcards" && <Layers className="w-3.5 h-3.5" />}
-                  {fmt === "Resumen" && <FileText className="w-3.5 h-3.5" />}
-                  {fmt === "Guia" && <BookOpen className="w-3.5 h-3.5" />}
-                  <span>{fmt === "Guia" ? "Guía" : fmt}</span>
+                  <div className="mb-1.5">
+                    <span
+                      className={`text-xs font-bold ${
+                        activeLight ? "text-purple-800 font-extrabold" : "text-purple-400"
+                      }`}
+                    >
+                      Pack 1 — General
+                    </span>
+                  </div>
+                  <p
+                    className={`text-[11px] leading-relaxed ${
+                      activeLight ? "text-slate-700" : "text-slate-400"
+                    }`}
+                  >
+                    Examen + Flashcards + Resumen con <strong>Opción 1 (General)</strong>
+                  </p>
                 </button>
-              ))}
+
+                {/* Pack 2: Matemáticas & Física */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResourceType("Pack_Matematicas");
+                    setEngineOption("opcion_2");
+                    setActiveResource(null);
+                    setPackActiveTab("guia");
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden select-none ${
+                    resourceType === "Pack_Matematicas"
+                      ? activeLight
+                        ? "bg-cyan-50/90 border-cyan-600 ring-2 ring-cyan-500/40 shadow-md shadow-cyan-900/10"
+                        : "bg-gradient-to-br from-cyan-600/20 via-indigo-600/15 to-transparent border-cyan-500 ring-2 ring-cyan-500/40 shadow-lg shadow-cyan-950/30"
+                      : activeLight
+                      ? "bg-white hover:bg-cyan-50/50 border-slate-200 hover:border-cyan-300 text-slate-800 shadow-2xs"
+                      : "bg-[#0c0f20] hover:bg-[#131732] border-[#1f2647] text-slate-200"
+                  }`}
+                >
+                  <div className="mb-1.5">
+                    <span
+                      className={`text-xs font-bold ${
+                        activeLight ? "text-cyan-900 font-extrabold" : "text-cyan-400"
+                      }`}
+                    >
+                      Pack 2 — Matemáticas & Física
+                    </span>
+                  </div>
+                  <p
+                    className={`text-[11px] leading-relaxed ${
+                      activeLight ? "text-slate-700" : "text-slate-400"
+                    }`}
+                  >
+                    Guía Feynman + Resumen con Fórmulas + Examen con <strong>Opción 2</strong>
+                  </p>
+                </button>
+              </div>
             </div>
 
             {/* Optimización & Cantidad */}
@@ -773,10 +1026,22 @@ export default function AiResourcesTab({
                 {generating ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Generando {resourceType.toLowerCase()} con IA resiliente...</span>
+                    <span>
+                      {resourceType === "Pack_General"
+                        ? "Generando Pack General (Examen, Flashcards, Resumen)..."
+                        : resourceType === "Pack_Matematicas"
+                        ? "Generando Pack Matemáticas & Física (Guía, Resumen, Examen)..."
+                        : `Generando ${resourceType.toLowerCase()} con IA resiliente...`}
+                    </span>
                   </>
                 ) : (
-                  <span>Generar {resourceType.toLowerCase()} al instante</span>
+                  <span>
+                    {resourceType === "Pack_General"
+                      ? "Generar Pack General"
+                      : resourceType === "Pack_Matematicas"
+                      ? "Generar Pack Matemáticas & Física"
+                      : `Generar ${resourceType.toLowerCase()} al instante`}
+                  </span>
                 )}
               </button>
 
@@ -792,6 +1057,28 @@ export default function AiResourcesTab({
                 <span className="font-extrabold text-sm text-purple-600 dark:text-purple-400 font-mono">
                   {currentTokenCost} {currentTokenCost === 1 ? "token" : "tokens"}
                 </span>
+                {resourceType === "Pack_General" && (
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      activeLight
+                        ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                        : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    }`}
+                  >
+                    ¡Ahorras 1 token!
+                  </span>
+                )}
+                {resourceType === "Pack_Matematicas" && (
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      activeLight
+                        ? "bg-cyan-100 text-cyan-950 border-cyan-300"
+                        : "text-cyan-400 bg-cyan-500/10 border-cyan-500/20"
+                    }`}
+                  >
+                    ¡Ahorras 3 tokens!
+                  </span>
+                )}
                 {isPro && (
                   <span className="text-slate-500 text-[11px] border-l pl-2 border-slate-200 dark:border-slate-800">
                     Te quedarán:{" "}
@@ -810,9 +1097,21 @@ export default function AiResourcesTab({
             </div>
 
             {errorMessage && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
-                <XCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMessage}</span>
+              <div className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 transition-all animate-in fade-in duration-200 ${
+                errorMessage.includes("demandados") || errorMessage.includes("demanda")
+                  ? activeLight
+                    ? "bg-amber-50 border-amber-200 text-amber-800"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                  : activeLight
+                  ? "bg-rose-50 border-rose-200 text-rose-700"
+                  : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+              }`}>
+                {errorMessage.includes("demandados") || errorMessage.includes("demanda") ? (
+                  <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+                ) : (
+                  <XCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                )}
+                <span className="font-medium leading-relaxed">{errorMessage}</span>
               </div>
             )}
           </div>
@@ -823,40 +1122,248 @@ export default function AiResourcesTab({
       {/* VISORES INTERACTIVOS DEL RECURSO GENERADO                     */}
       {/* ============================================================= */}
 
-      {activeResource && (
-        <div className={`rounded-3xl p-6 sm:p-9 shadow-2xl space-y-6 animate-in slide-in-from-bottom-4 duration-300 border ${activeLight ? "bg-white border-slate-200/90 shadow-xl" : "bg-[#0a0d1b] border-[#1e2544]"}`}>
+      {activeResource && (() => {
+        const isPack =
+          activeResource.tipo_recurso === "Pack_General" ||
+          activeResource.tipo_recurso === "Pack_Matematicas";
 
-          
-          {/* Header del Recurso con Badge de Fuente */}
-          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${activeLight ? "border-slate-100" : "border-[#1a213d]"}`}>
+        const resolvedExamenData: PreguntaExamen[] = isPack
+          ? activeResource.contenido?.examen || []
+          : Array.isArray(activeResource.contenido)
+          ? activeResource.contenido
+          : [];
 
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase font-extrabold text-[#7c5dfa] tracking-wider">
-                  {activeResource.tipo_recurso}
-                </span>
-                <span className="text-slate-500">&bull;</span>
-                <span className="text-xs text-slate-300 font-semibold">{activeResource.materia}</span>
+        const resolvedFlashcardsData: FlashcardItem[] = isPack
+          ? activeResource.contenido?.flashcards || []
+          : Array.isArray(activeResource.contenido)
+          ? activeResource.contenido
+          : [];
+
+        const resolvedGuiaData = isPack
+          ? activeResource.contenido?.guia
+          : activeResource.tipo_recurso === "Guia"
+          ? activeResource.contenido
+          : null;
+
+        const resolvedResumenData = isPack
+          ? activeResource.contenido?.resumen
+          : activeResource.tipo_recurso === "Resumen"
+          ? activeResource.contenido
+          : null;
+
+        const showExamenView =
+          (activeResource.tipo_recurso === "Examen" && resolvedExamenData.length > 0) ||
+          (isPack && packActiveTab === "examen" && resolvedExamenData.length > 0);
+
+        const showFlashcardsView =
+          (activeResource.tipo_recurso === "Flashcards" && resolvedFlashcardsData.length > 0) ||
+          (isPack && packActiveTab === "flashcards" && resolvedFlashcardsData.length > 0);
+
+        const showGuiaView =
+          (activeResource.tipo_recurso === "Guia" && Boolean(resolvedGuiaData?.resumen_markdown)) ||
+          (isPack && packActiveTab === "guia" && Boolean(resolvedGuiaData?.resumen_markdown));
+
+        const showResumenView =
+          (activeResource.tipo_recurso === "Resumen" && Boolean(resolvedResumenData?.resumen_markdown)) ||
+          (isPack && packActiveTab === "resumen" && Boolean(resolvedResumenData?.resumen_markdown));
+
+        return (
+          <div className={`rounded-3xl p-6 sm:p-9 shadow-2xl space-y-6 animate-in slide-in-from-bottom-4 duration-300 border ${activeLight ? "bg-white border-slate-200/90 shadow-xl" : "bg-[#0a0d1b] border-[#1e2544]"}`}>
+            {/* Header del Recurso con Badge de Fuente */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${activeLight ? "border-slate-100" : "border-[#1a213d]"}`}>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase font-extrabold text-[#7c5dfa] tracking-wider">
+                    {activeResource.tipo_recurso === "Pack_General"
+                      ? "Pack 1 — General (3 Recursos)"
+                      : activeResource.tipo_recurso === "Pack_Matematicas"
+                      ? "Pack 2 — Matemáticas & Física (3 Recursos)"
+                      : activeResource.tipo_recurso}
+                  </span>
+                  <span className="text-slate-500">&bull;</span>
+                  <span className="text-xs text-slate-300 font-semibold">{activeResource.materia}</span>
+                </div>
+                <h3 className={`text-xl sm:text-2xl font-bold tracking-tight mt-0.5 ${activeLight ? "text-slate-900" : "text-white"}`}>
+                  {activeResource.tema}
+                </h3>
               </div>
-              <h3 className={`text-xl sm:text-2xl font-bold tracking-tight mt-0.5 ${activeLight ? "text-slate-900" : "text-white"}`}>
 
-                {activeResource.tema}
-              </h3>
-            </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {showExamenView && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      exportExamToPDF({
+                        tema: activeResource.tema,
+                        materia: activeResource.materia,
+                        dificultad: activeResource.dificultad,
+                        preguntas: resolvedExamenData,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border shadow-xs ${
+                      activeLight
+                        ? "bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200"
+                        : "bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/40"
+                    }`}
+                    title="Descargar examen en PDF"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Descargar Examen (PDF)</span>
+                  </button>
+                )}
 
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold flex items-center gap-1.5">
-                <Zap className="w-3 h-3 text-emerald-400" />
-                <span>
-                  {activeResource.fuente === "cache"
-                    ? "Caché Instantánea (0ms)"
-                    : "Motor Resiliente Dalat"}
+                {showFlashcardsView && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      exportFlashcardsToPDF({
+                        tema: activeResource.tema,
+                        materia: activeResource.materia,
+                        dificultad: activeResource.dificultad,
+                        flashcards: resolvedFlashcardsData,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border shadow-xs ${
+                      activeLight
+                        ? "bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200"
+                        : "bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/40"
+                    }`}
+                    title="Descargar tarjetas de estudio en PDF"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Descargar Flashcards (PDF)</span>
+                  </button>
+                )}
+
+                <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold flex items-center gap-1.5">
+                  <Zap className="w-3 h-3 text-emerald-400" />
+                  <span>
+                    {activeResource.fuente === "cache"
+                      ? "Caché Instantánea (0ms)"
+                      : "Motor Resiliente Dalat"}
+                  </span>
                 </span>
-              </span>
+              </div>
             </div>
-          </div>
 
-          {/* Contenedor relativo para el Recurso y el Overlay Paywall Teaser */}
+            {/* Si es un Pack, mostramos el conmutador de pestañas del Pack */}
+            {isPack && (
+              <div
+                className={`flex flex-wrap items-center gap-2 p-1.5 rounded-2xl select-none border ${
+                  activeLight ? "bg-slate-100/90 border-slate-200" : "bg-black/20 border-white/10"
+                }`}
+              >
+                <span className={`text-[11px] font-bold px-2 uppercase tracking-wider flex items-center gap-1.5 ${activeLight ? "text-slate-700" : "text-slate-400"}`}>
+                  <Package className={`w-3.5 h-3.5 ${activeLight ? "text-purple-700" : "text-purple-400"}`} />
+                  <span>Recursos del Pack:</span>
+                </span>
+                {activeResource.tipo_recurso === "Pack_General" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPackActiveTab("examen");
+                        setCurrentQuestionIndex(0);
+                        setIsQuizFinished(false);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        packActiveTab === "examen"
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400"
+                          : activeLight
+                          ? "bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 shadow-2xs"
+                          : "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300"
+                      }`}
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span>Examen (5 preguntas)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPackActiveTab("flashcards");
+                        setCurrentCardIndex(0);
+                        setIsFlipped(false);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        packActiveTab === "flashcards"
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400"
+                          : activeLight
+                          ? "bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 shadow-2xs"
+                          : "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300"
+                      }`}
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Flashcards (6 tarjetas)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPackActiveTab("resumen")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        packActiveTab === "resumen"
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400"
+                          : activeLight
+                          ? "bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 shadow-2xs"
+                          : "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300"
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Resumen Estructurado</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPackActiveTab("guia")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        packActiveTab === "guia"
+                          ? "bg-cyan-600 text-white shadow-md shadow-cyan-900/30 ring-1 ring-cyan-400"
+                          : activeLight
+                          ? "bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 shadow-2xs"
+                          : "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300"
+                      }`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Guía Feynman (con Descargar PDF)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPackActiveTab("resumen")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        packActiveTab === "resumen"
+                          ? "bg-cyan-600 text-white shadow-md shadow-cyan-900/30 ring-1 ring-cyan-400"
+                          : activeLight
+                          ? "bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 shadow-2xs"
+                          : "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300"
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Resumen con Fórmulas</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPackActiveTab("examen");
+                        setCurrentQuestionIndex(0);
+                        setIsQuizFinished(false);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        packActiveTab === "examen"
+                          ? "bg-cyan-600 text-white shadow-md shadow-cyan-900/30 ring-1 ring-cyan-400"
+                          : activeLight
+                          ? "bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 shadow-2xs"
+                          : "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300"
+                      }`}
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span>Examen Cuantitativo</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Contenedor relativo para el Recurso y el Overlay Paywall Teaser */}
           <div className="relative pt-3">
             <div
               className={
@@ -868,29 +1375,52 @@ export default function AiResourcesTab({
               {/* --------------------------------------------------------- */}
               {/* CASO 1: SIMULADOR DE EXAMEN INTERACTIVO                   */}
               {/* --------------------------------------------------------- */}
-          {activeResource.tipo_recurso === "Examen" && Array.isArray(activeResource.contenido) && (
+          {showExamenView && resolvedExamenData.length > 0 && (
             <div>
               {!isQuizFinished ? (
                 <div className="space-y-6 max-w-2xl mx-auto">
-                  {/* Barra de progreso */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-slate-400 font-medium">
-                      <span>Pregunta {currentQuestionIndex + 1} de {activeResource.contenido.length}</span>
-                      <span>Correctas: <strong className="text-emerald-400">{correctCount}</strong></span>
+                  {/* Barra de progreso y botón Descargar PDF */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex justify-between text-xs text-slate-400 font-medium">
+                        <span>Pregunta {currentQuestionIndex + 1} de {resolvedExamenData.length}</span>
+                        <span>Correctas: <strong className="text-emerald-400">{correctCount}</strong></span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-[#161a2b] overflow-hidden">
+                        <div
+                          className="h-full bg-[#7c5dfa] transition-all duration-300"
+                          style={{
+                            width: `${((currentQuestionIndex + 1) / resolvedExamenData.length) * 100}%`,
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full h-1.5 rounded-full bg-[#161a2b] overflow-hidden">
-                      <div
-                        className="h-full bg-[#7c5dfa] transition-all duration-300"
-                        style={{
-                          width: `${((currentQuestionIndex + 1) / activeResource.contenido.length) * 100}%`,
-                        }}
-                      />
-                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        exportExamToPDF({
+                          tema: activeResource.tema,
+                          materia: activeResource.materia,
+                          dificultad: activeResource.dificultad,
+                          preguntas: resolvedExamenData,
+                        })
+                      }
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border shadow-xs shrink-0 ${
+                        activeLight
+                          ? "bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200"
+                          : "bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/40"
+                      }`}
+                      title="Descargar examen en PDF"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Descargar PDF</span>
+                    </button>
                   </div>
 
                   {/* Pregunta */}
                   {(() => {
-                    const q: PreguntaExamen = activeResource.contenido[currentQuestionIndex];
+                    const q: PreguntaExamen = resolvedExamenData[currentQuestionIndex] || resolvedExamenData[0];
                     const chosen = revealedQuestions[currentQuestionIndex];
                     const isAnswered = chosen !== undefined;
 
@@ -955,11 +1485,11 @@ export default function AiResourcesTab({
                         {isAnswered && (
                           <div className="pt-2 flex justify-end">
                             <button
-                              onClick={() => handleNextQuestion(activeResource.contenido.length)}
+                              onClick={() => handleNextQuestion(resolvedExamenData.length)}
                               className="px-6 py-2.5 rounded-xl bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-[#7c5dfa]/20 transition active:scale-95"
                             >
                               <span>
-                                {currentQuestionIndex + 1 === activeResource.contenido.length
+                                {currentQuestionIndex + 1 === resolvedExamenData.length
                                   ? "Ver resultado final"
                                   : "Siguiente pregunta"}
                               </span>
@@ -988,27 +1518,48 @@ export default function AiResourcesTab({
                       Calificación Obtenida
                     </span>
                     <div className="text-5xl font-black text-white tracking-tight">
-                      {((correctCount / activeResource.contenido.length) * 10).toFixed(1)}
+                      {((correctCount / resolvedExamenData.length) * 10).toFixed(1)}
                       <span className="text-xl text-slate-500 font-normal"> / 10.0</span>
                     </div>
                     <p className="text-xs text-emerald-400 font-semibold pt-1">
-                      {correctCount} de {activeResource.contenido.length} respuestas correctas (
-                      {Math.round((correctCount / activeResource.contenido.length) * 100)}%)
+                      {correctCount} de {resolvedExamenData.length} respuestas correctas (
+                      {Math.round((correctCount / resolvedExamenData.length) * 100)}%)
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setCurrentQuestionIndex(0);
-                      setRevealedQuestions({});
-                      setCorrectCount(0);
-                      setIsQuizFinished(false);
-                    }}
-                    className={`px-6 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 mx-auto transition cursor-pointer ${activeLight ? "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700" : "bg-[#1b213b] hover:bg-[#252e50] text-slate-200 hover:text-white"}`}
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Reintentar simulacro</span>
-                  </button>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <button
+                      onClick={() =>
+                        exportExamToPDF({
+                          tema: activeResource.tema,
+                          materia: activeResource.materia,
+                          dificultad: activeResource.dificultad,
+                          preguntas: resolvedExamenData,
+                        })
+                      }
+                      className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/20 transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Descargar Examen en PDF</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setCurrentQuestionIndex(0);
+                        setRevealedQuestions({});
+                        setCorrectCount(0);
+                        setIsQuizFinished(false);
+                      }}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        activeLight
+                          ? "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700"
+                          : "bg-[#1b213b] hover:bg-[#252e50] text-slate-200 hover:text-white"
+                      }`}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reintentar simulacro</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1017,21 +1568,45 @@ export default function AiResourcesTab({
           {/* --------------------------------------------------------- */}
           {/* CASO 2: MAZO INTERACTIVO DE FLASHCARDS                    */}
           {/* --------------------------------------------------------- */}
-          {activeResource.tipo_recurso === "Flashcards" && Array.isArray(activeResource.contenido) && (
+          {showFlashcardsView && resolvedFlashcardsData.length > 0 && (
             <div className="max-w-lg mx-auto space-y-6">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>
-                  Tarjeta {currentCardIndex + 1} de {activeResource.contenido.length}
-                </span>
-                <span className="text-emerald-400 font-semibold">
-                  Dominadas: {masteredCards.size} / {activeResource.contenido.length}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span>
+                    Tarjeta {currentCardIndex + 1} de {resolvedFlashcardsData.length}
+                  </span>
+                  <span className="text-slate-500">&bull;</span>
+                  <span className="text-emerald-400 font-semibold">
+                    Dominadas: {masteredCards.size} / {resolvedFlashcardsData.length}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    exportFlashcardsToPDF({
+                      tema: activeResource.tema,
+                      materia: activeResource.materia,
+                      dificultad: activeResource.dificultad,
+                      flashcards: resolvedFlashcardsData,
+                    })
+                  }
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border shadow-xs ${
+                    activeLight
+                      ? "bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200"
+                      : "bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/40"
+                  }`}
+                  title="Descargar tarjetas de estudio en PDF listo para imprimir o recortar"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar PDF</span>
+                </button>
               </div>
 
               {/* Tarjeta Flip 3D */}
               {(() => {
-                const card: FlashcardItem = activeResource.contenido[currentCardIndex];
-                const isMastered = masteredCards.has(card.id);
+                const card: FlashcardItem = resolvedFlashcardsData[currentCardIndex] || resolvedFlashcardsData[0];
+                const isMastered = card?.id ? masteredCards.has(card.id) : false;
 
                 return (
                   <div
@@ -1040,7 +1615,7 @@ export default function AiResourcesTab({
                   >
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-semibold">
-                        {card.categoria || "Concepto"}
+                        {card?.categoria || "Concepto"}
                       </span>
                       <span className="text-[#a78bfa] text-xs font-medium flex items-center gap-1 group-hover:underline">
                         <span>{isFlipped ? "Ver pregunta" : "Toca para ver respuesta"}</span>
@@ -1051,12 +1626,12 @@ export default function AiResourcesTab({
                     <div className="py-6 text-center">
                       <p className={`text-base sm:text-lg font-bold leading-relaxed ${activeLight ? "text-slate-900" : "text-white"}`}>
 
-                        {isFlipped ? card.reverso : card.anverso}
+                        {isFlipped ? card?.reverso : card?.anverso}
                       </p>
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>Dificultad: {card.dificultad || activeResource.dificultad}</span>
+                      <span>Dificultad: {card?.dificultad || activeResource.dificultad}</span>
                       {isMastered && (
                         <span className="text-emerald-400 font-bold flex items-center gap-1">
                           <Check className="w-3.5 h-3.5" /> Dominada
@@ -1082,11 +1657,11 @@ export default function AiResourcesTab({
 
                 <button
                   onClick={() => {
-                    const card = activeResource.contenido[currentCardIndex];
-                    toggleMastered(card.id);
+                    const card = resolvedFlashcardsData[currentCardIndex] || resolvedFlashcardsData[0];
+                    if (card?.id) toggleMastered(card.id);
                   }}
                   className={`px-5 py-2.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
-                    masteredCards.has(activeResource.contenido[currentCardIndex]?.id)
+                    masteredCards.has((resolvedFlashcardsData[currentCardIndex] || resolvedFlashcardsData[0])?.id)
                       ? activeLight
                         ? "bg-emerald-50 border-emerald-400 text-emerald-800 font-semibold"
                         : "bg-emerald-950/60 border-emerald-500 text-emerald-200"
@@ -1097,17 +1672,17 @@ export default function AiResourcesTab({
                 >
                   <Check className="w-3.5 h-3.5" />
                   <span>
-                    {masteredCards.has(activeResource.contenido[currentCardIndex]?.id)
+                    {masteredCards.has((resolvedFlashcardsData[currentCardIndex] || resolvedFlashcardsData[0])?.id)
                       ? "Tarjeta dominada"
                       : "Marcar como dominada"}
                   </span>
                 </button>
 
                 <button
-                  disabled={currentCardIndex + 1 >= activeResource.contenido.length}
+                  disabled={currentCardIndex + 1 >= resolvedFlashcardsData.length}
                   onClick={() => {
                     setCurrentCardIndex((prev) =>
-                      Math.min(activeResource.contenido.length - 1, prev + 1)
+                      Math.min(resolvedFlashcardsData.length - 1, prev + 1)
                     );
                     setIsFlipped(false);
                   }}
@@ -1120,60 +1695,28 @@ export default function AiResourcesTab({
           )}
 
           {/* --------------------------------------------------------- */}
-          {/* CASO 3 & 4: RESUMEN / GUÍA DE ESTUDIO ESTRUCTURADA        */}
+          {/* CASO 3: GUÍA DE ESTUDIO PASO A PASO (FEYNMAN)             */}
           {/* --------------------------------------------------------- */}
-          {(activeResource.tipo_recurso === "Resumen" || activeResource.tipo_recurso === "Guia") &&
-            activeResource.contenido?.resumen_markdown && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h4 className={`text-base font-bold ${activeLight ? "text-slate-900" : "text-white"}`}>
+          {showGuiaView && resolvedGuiaData?.resumen_markdown && (
+            <StudyGuideRenderer
+              markdown={resolvedGuiaData.resumen_markdown}
+              title={resolvedGuiaData.titulo || "Guía de Estudio Paso a Paso"}
+              keyConcepts={resolvedGuiaData.puntos_clave}
+              activeLight={activeLight}
+            />
+          )}
 
-                    {activeResource.contenido.titulo}
-                  </h4>
-                  <button
-                    onClick={() => handleCopyMarkdown(activeResource.contenido.resumen_markdown)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border ${activeLight ? "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700" : "bg-[#111425] border-[#1e233d] text-slate-300 hover:text-white"}`}
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Copiado</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copiar material</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Contenido en caja de lectura */}
-                <div className={`p-6 rounded-2xl font-sans text-xs sm:text-sm leading-relaxed whitespace-pre-wrap border ${activeLight ? "bg-slate-50/90 border-slate-200 text-slate-800 shadow-xs" : "bg-[#090b14] border-[#161a2b] text-slate-300"}`}>
-
-                  {activeResource.contenido.resumen_markdown}
-                </div>
-
-                {/* Puntos clave */}
-                {activeResource.contenido.puntos_clave && (
-                  <div className="space-y-2">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider block">
-                      Conceptos Clave para el Parcial:
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {activeResource.contenido.puntos_clave.map((pt: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className={`px-3 py-1 rounded-xl text-xs font-medium border ${activeLight ? "bg-purple-50 border-purple-200 text-purple-800 font-semibold" : "bg-[#111629] border-[#212845] text-slate-200"}`}
-                        >
-                          {pt}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+          {/* --------------------------------------------------------- */}
+          {/* CASO 4: RESUMEN ACADÉMICO ESTRUCTURADO                    */}
+          {/* --------------------------------------------------------- */}
+          {showResumenView && resolvedResumenData?.resumen_markdown && (
+            <StudyGuideRenderer
+              markdown={resolvedResumenData.resumen_markdown}
+              title={resolvedResumenData.titulo || "Resumen Académico"}
+              keyConcepts={resolvedResumenData.puntos_clave}
+              activeLight={activeLight}
+            />
+          )}
             </div>
 
             {/* Overlay Paywall PRO cuando el usuario es gratuito */}
@@ -1240,13 +1783,447 @@ export default function AiResourcesTab({
             )}
           </div>
         </div>
-      )}
+      );
+    })()}
 
-      {/* Notificación flotante al subir archivo */}
-      {uploadSuccessToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#101428] border border-emerald-500/50 shadow-2xl rounded-2xl px-4 py-3 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="text-xs text-white font-medium">{uploadSuccessToast}</span>
+      {/* MODAL EXPLORADOR DE REPOSITORIOS (NIVEL 1 Y NIVEL 2) */}
+      {isRepoExplorerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-3xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col ${
+              activeLight
+                ? "bg-white border-slate-200 text-slate-900 shadow-slate-900/10"
+                : "bg-[#0b0d17] border-white/10 text-white shadow-black/80"
+            }`}
+          >
+            {/* Header */}
+            <div className={`p-5 sm:p-6 border-b flex items-center justify-between gap-4 ${activeLight ? "border-slate-100" : "border-white/[0.08]"}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/25 text-purple-500 flex items-center justify-center shrink-0">
+                  <Folder className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-base font-bold ${activeLight ? "text-slate-900" : "text-white"}`}>
+                    {selectedRepoId === null
+                      ? "Explorador de Repositorios"
+                      : (equipos.find((e) => e.id_equipo === selectedRepoId)?.nombre || "Documentos del Repositorio")}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {selectedRepoId === null
+                      ? "Selecciona un repositorio para ver y elegir tus documentos compatibles con IA"
+                      : "Elige un archivo de este repositorio para generar recursos de estudio"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedRepoId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRepoId(null)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                      activeLight
+                        ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        : "bg-white/10 hover:bg-white/15 text-slate-200"
+                    }`}
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Volver a repositorios</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRepoExplorerOpen(false);
+                    setSelectedRepoId(null);
+                  }}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* VISTA 1: LISTADO DE REPOSITORIOS (NIVEL 1) */}
+            {selectedRepoId === null ? (
+              <div className="p-5 sm:p-6 overflow-y-auto max-h-[520px] space-y-5">
+                {/* Píldoras de Filtro: Equipos de Estudio vs Apuntes Personales */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRepoFilterTab("equipos")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                      repoFilterTab === "equipos"
+                        ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                        : activeLight
+                        ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "bg-white/[0.05] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Equipos de Estudio</span>
+                    <span className="w-4 h-4 rounded-full text-[10px] bg-white/20 flex items-center justify-center font-bold">
+                      {equipos.filter((e) => !e.es_personal).length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRepoFilterTab("personal")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                      repoFilterTab === "personal"
+                        ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                        : activeLight
+                        ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "bg-white/[0.05] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Folder className="w-3.5 h-3.5" />
+                    <span>Apuntes Personales</span>
+                    <span className="w-4 h-4 rounded-full text-[10px] bg-white/20 flex items-center justify-center font-bold">
+                      {equipos.filter((e) => e.es_personal).length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Cuadros de Repositorios en Grilla */}
+                {equipos.filter((e) => (repoFilterTab === "personal" ? e.es_personal : !e.es_personal)).length === 0 ? (
+                  <div
+                    className={`rounded-2xl border p-10 text-center space-y-3 ${
+                      activeLight ? "bg-slate-50 border-slate-200" : "bg-white/[0.02] border-white/[0.06]"
+                    }`}
+                  >
+                    <Folder className="w-8 h-8 text-slate-400 mx-auto opacity-50" />
+                    <p className="text-xs font-semibold text-slate-400">
+                      No tienes repositorios en esta sección aún.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {equipos
+                      .filter((e) => (repoFilterTab === "personal" ? e.es_personal : !e.es_personal))
+                      .map((team) => {
+                        const totalDocs = team.documentos?.length || team.documentos_count || 0;
+                        return (
+                          <div
+                            key={team.id_equipo}
+                            onClick={() => setSelectedRepoId(team.id_equipo)}
+                            className={`group rounded-2xl border p-5 flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-1 ${
+                              activeLight
+                                ? "bg-white border-slate-200/90 shadow-sm hover:shadow-md hover:border-purple-300"
+                                : "bg-[#0c0e18] border-[#171c2f] hover:border-[#2f385c] hover:bg-[#0f1220]"
+                            }`}
+                          >
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-sm"
+                                  style={{ backgroundColor: team.color || "#7c5dfa" }}
+                                >
+                                  {team.icono_iniciales || "EQ"}
+                                </div>
+                                <div className="min-w-0">
+                                  <span
+                                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
+                                    style={{
+                                      backgroundColor: `${team.color || "#7c5dfa"}15`,
+                                      color: team.color || "#7c5dfa",
+                                      border: `1px solid ${team.color || "#7c5dfa"}35`,
+                                    }}
+                                  >
+                                    {team.materia || "GENERAL"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <h4
+                                  className={`text-base font-bold tracking-tight truncate ${
+                                    activeLight ? "text-slate-900 group-hover:text-purple-600" : "text-white group-hover:text-purple-400"
+                                  }`}
+                                >
+                                  {team.nombre}
+                                </h4>
+                                <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">
+                                  {team.descripcion || (team.es_personal ? "Notas personales privadas" : `Equipo de estudio colaborativo para ${team.materia}`)}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
+                                <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg">
+                                  <Users className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span>
+                                    {team.miembros_count || 1} {(team.miembros_count || 1) === 1 ? "miembro" : "miembros"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg">
+                                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>
+                                    {totalDocs} {totalDocs === 1 ? "material" : "materiales"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-semibold text-purple-400 group-hover:text-purple-300">
+                              <span>Ver y elegir materiales</span>
+                              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* VISTA 2: DOCUMENTOS DENTRO DEL REPOSITORIO SELECCIONADO (NIVEL 2) */
+              <div className="p-5 sm:p-6 overflow-y-auto max-h-[520px] space-y-4">
+                {/* Buscador dentro del repositorio */}
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={explorerSearch}
+                    onChange={(e) => setExplorerSearch(e.target.value)}
+                    placeholder="Buscar archivo en este repositorio..."
+                    className={`w-full text-xs pl-10 pr-8 py-2.5 rounded-xl border transition-colors outline-none ${
+                      activeLight
+                        ? "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-purple-400"
+                        : "bg-[#090b16] border-[#1f2644] text-white placeholder-slate-500 focus:border-purple-500/60"
+                    }`}
+                  />
+                  {explorerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setExplorerSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Lista de Documentos del Repositorio */}
+                {(() => {
+                  const currentRepo = equipos.find((e) => e.id_equipo === selectedRepoId);
+                  const docs = currentRepo?.documentos || [];
+                  const filteredDocs = docs.filter((d) =>
+                    !explorerSearch.trim() || d.nombre.toLowerCase().includes(explorerSearch.toLowerCase())
+                  );
+
+                  if (filteredDocs.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+                        <FileText className="w-8 h-8 mx-auto opacity-40 text-purple-400" />
+                        <p className="font-semibold text-slate-300">No hay documentos en este repositorio</p>
+                        <p className="text-[11px] text-slate-500">
+                          Sube guías o apuntes en la pestaña Repositorio para poder utilizarlos con el generador de IA.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2.5">
+                      {filteredDocs.map((doc) => {
+                        const fmt = (doc.formato || "").toUpperCase();
+                        const docNameLower = doc.nombre.toLowerCase();
+                        const isLink =
+                          fmt === "LINK" ||
+                          fmt === "NOTION" ||
+                          doc.tamano === "Enlace" ||
+                          Boolean(doc.url_recurso?.startsWith("http")) ||
+                          docNameLower.startsWith("http");
+
+                        const isArchive =
+                          fmt === "ZIP" ||
+                          fmt === "RAR" ||
+                          fmt === "7Z" ||
+                          fmt === "TAR" ||
+                          fmt === "GZ" ||
+                          fmt.includes("ZIP") ||
+                          fmt.includes("RAR") ||
+                          docNameLower.endsWith(".zip") ||
+                          docNameLower.endsWith(".rar") ||
+                          docNameLower.endsWith(".7z") ||
+                          docNameLower.endsWith(".tar") ||
+                          docNameLower.endsWith(".gz") ||
+                          docNameLower.endsWith(".tgz");
+
+                        const isSelected = selectedFileId === `doc_${doc.id_documento}` || selectedFile?.name === doc.nombre;
+
+                        // Caso 1: ENLACES WEB Y ARCHIVOS COMPRIMIDOS (NO disponibles para IA)
+                        if (isLink || isArchive) {
+                          return (
+                            <div
+                              key={doc.id_documento}
+                              className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 opacity-50 cursor-not-allowed select-none ${
+                                activeLight
+                                  ? "bg-slate-100/70 border-slate-200 text-slate-500"
+                                  : "bg-white/[0.02] border-white/[0.06] text-slate-400"
+                              }`}
+                              title={
+                                isArchive
+                                  ? "Los archivos comprimidos (.zip, .rar) no están disponibles para generar recursos con IA."
+                                  : "Los enlaces web no están disponibles para generar recursos con IA."
+                              }
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 flex items-center gap-1 ${
+                                    isArchive
+                                      ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                                      : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                  }`}
+                                >
+                                  {isArchive ? <FileArchive className="w-3 h-3" /> : <Link2 className="w-3 h-3" />}
+                                  <span>{isArchive ? "ZIP" : "ENLACE"}</span>
+                                </span>
+                                <div className="min-w-0">
+                                  <h5 className="text-xs sm:text-sm font-semibold truncate line-through">
+                                    {doc.nombre}
+                                  </h5>
+                                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                    {isArchive
+                                      ? "Archivo comprimido (ZIP/RAR) • No ejecutable"
+                                      : "Enlace web o Google Drive • Solo lectura"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span className="text-[10px] font-semibold text-amber-500/90 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg shrink-0">
+                                No disponible para IA
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        // Caso 2: DOCUMENTOS REALES (PDF, DOCX, TXT, PPT) -> Elegibles
+                        const docType: "pdf" | "docx" | "txt" | "ppt" =
+                          fmt.includes("DOC") ||
+                          fmt.includes("WORD") ||
+                          doc.nombre.toLowerCase().endsWith(".docx") ||
+                          doc.nombre.toLowerCase().endsWith(".doc")
+                            ? "docx"
+                            : fmt.includes("TXT") ||
+                              fmt.includes("MD") ||
+                              doc.nombre.toLowerCase().endsWith(".txt") ||
+                              doc.nombre.toLowerCase().endsWith(".md")
+                            ? "txt"
+                            : fmt.includes("PPT") ||
+                              doc.nombre.toLowerCase().endsWith(".pptx") ||
+                              doc.nombre.toLowerCase().endsWith(".ppt")
+                            ? "ppt"
+                            : "pdf";
+
+                        return (
+                          <div
+                            key={doc.id_documento}
+                            onClick={() => {
+                              const chosen: MaterialFile = {
+                                id: `doc_${doc.id_documento}`,
+                                backendDocId: doc.id_documento,
+                                name: doc.nombre,
+                                subject: currentRepo?.nombre || "Repositorio Académico",
+                                size: doc.tamano || "1.0 MB",
+                                type: docType,
+                                isLink: false,
+                                isArchive: false,
+                                isLocal: false,
+                                previewText: doc.descripcion || doc.nombre,
+                              };
+                              setFiles((prev) => [chosen, ...prev.filter((m) => m.id !== chosen.id)]);
+                              setSelectedFileId(chosen.id);
+                              setActiveResource(null);
+                              setIsRepoExplorerOpen(false);
+                              setSelectedRepoId(null);
+                            }}
+                            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? activeLight
+                                  ? "bg-purple-50/80 border-purple-500 ring-2 ring-purple-400/30 shadow-sm"
+                                  : "bg-purple-950/40 border-purple-500 ring-2 ring-purple-500/30 shadow-sm"
+                                : activeLight
+                                ? "bg-white hover:bg-slate-50 border-slate-200/80 text-slate-800 hover:border-slate-300"
+                                : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-200 hover:border-white/[0.15]"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 ${
+                                  docType === "pdf"
+                                    ? "bg-rose-500/15 text-rose-600 border border-rose-500/25"
+                                    : docType === "docx"
+                                    ? "bg-blue-500/15 text-blue-600 border border-blue-500/25"
+                                    : docType === "ppt"
+                                    ? "bg-amber-500/15 text-amber-600 border border-amber-500/25"
+                                    : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25"
+                                }`}
+                              >
+                                {docType.toUpperCase()}
+                              </span>
+
+                              <div className="min-w-0">
+                                <h4 className="text-xs sm:text-sm font-bold truncate">{doc.nombre}</h4>
+                                <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                  {currentRepo?.nombre} &bull; {doc.tamano || "1.0 MB"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {isSelected ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-xl">
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Seleccionado</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-xl border transition cursor-pointer ${
+                                    activeLight
+                                      ? "text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 border-purple-200"
+                                      : "text-purple-300 hover:text-white bg-purple-500/15 hover:bg-purple-500/25 border-purple-500/30"
+                                  }`}
+                                >
+                                  Elegir
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Footer Modal */}
+            <div className={`p-4 sm:p-5 border-t flex items-center justify-between text-xs text-slate-400 ${activeLight ? "border-slate-100 bg-slate-50/50" : "border-white/[0.08] bg-white/[0.02]"}`}>
+              <span>
+                {selectedRepoId === null
+                  ? `${equipos.length} repositorios disponibles`
+                  : `Mostrando materiales de ${equipos.find((e) => e.id_equipo === selectedRepoId)?.nombre || "este repositorio"}`}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRepoExplorerOpen(false);
+                  setSelectedRepoId(null);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer ${
+                  activeLight
+                    ? "bg-slate-200 hover:bg-slate-300 text-slate-700"
+                    : "bg-white/10 hover:bg-white/15 text-white"
+                }`}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

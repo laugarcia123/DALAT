@@ -49,6 +49,15 @@ export interface DocumentoCreatePayload {
   descripcion?: string | null;
 }
 
+export interface StorageQuotaInfo {
+  usado_mb: number;
+  limite_mb: number;
+  limite_texto: string;
+  porcentaje_usado: number;
+  documentos_count: number;
+  es_pro: boolean;
+}
+
 export const repositoryService = {
   /**
    * Obtiene la lista de equipos o carpetas personales con sus documentos.
@@ -56,6 +65,20 @@ export const repositoryService = {
   async getEquipos(esPersonal?: boolean): Promise<EquipoItem[]> {
     const query = esPersonal !== undefined ? `?es_personal=${esPersonal}` : "";
     return apiFetch<EquipoItem[]>(`/repositorio/equipos${query}`);
+  },
+
+  /**
+   * Obtiene todos los documentos del repositorio del estudiante.
+   */
+  async getAllDocumentos(): Promise<DocumentoItem[]> {
+    return apiFetch<DocumentoItem[]>("/repositorio/documentos");
+  },
+
+  /**
+   * Consulta el uso y límite de la cuota de almacenamiento (70 MB gratis vs 2 GB PRO/Institucional).
+   */
+  async getStorageQuota(): Promise<StorageQuotaInfo> {
+    return apiFetch<StorageQuotaInfo>("/repositorio/cuota");
   },
 
   /**
@@ -83,6 +106,16 @@ export const repositoryService = {
    */
   async getDocumentos(id_equipo: number): Promise<DocumentoItem[]> {
     return apiFetch<DocumentoItem[]>(`/repositorio/equipos/${id_equipo}/documentos`);
+  },
+
+  /**
+   * Sube un archivo real directamente al almacenamiento Cloudflare R2 vía backend.
+   */
+  async uploadDocumentoFile(formData: FormData): Promise<DocumentoItem> {
+    return apiFetch<DocumentoItem>("/repositorio/upload", {
+      method: "POST",
+      body: formData,
+    });
   },
 
   /**

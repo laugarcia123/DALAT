@@ -19,6 +19,8 @@ export interface UserProfile {
   semester: string;
   bio: string;
   avatarColor: string;
+  isInstitutional?: boolean;
+  tokensBalance?: number;
   plan?: string;
   targetGpa?: string;
   studyStreakDays?: number;

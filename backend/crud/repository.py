@@ -59,7 +59,7 @@ def create_equipo(
         color=equipo_in.color or "#7c5dfa",
         es_personal=equipo_in.es_personal or False,
         codigo_invitacion=slug_invitacion,
-        miembros_count=equipo_in.miembros_count or (1 if equipo_in.es_personal else 3),
+        miembros_count=equipo_in.miembros_count or 1,
     )
     db.add(db_equipo)
     db.commit()
@@ -88,6 +88,41 @@ def get_equipo_documentos(
         .order_by(DocumentoRepositorio.fecha_creacion.desc())
         .all()
     )
+
+
+def get_all_user_documentos(
+    db: Session,
+    user_id: int,
+) -> List[DocumentoRepositorio]:
+    """Lista todos los documentos del repositorio de un estudiante (personales y grupales)."""
+    return (
+        db.query(DocumentoRepositorio)
+        .filter(DocumentoRepositorio.id_usuario == user_id)
+        .order_by(DocumentoRepositorio.fecha_creacion.desc())
+        .all()
+    )
+
+
+def calculate_storage_used_mb(
+    db: Session,
+    user_id: int,
+) -> float:
+    """Calcula el tamaño total usado en MB por el estudiante."""
+    docs = db.query(DocumentoRepositorio).filter(DocumentoRepositorio.id_usuario == user_id).all()
+    total_mb = 0.0
+    for d in docs:
+        if d.tamano:
+            t = d.tamano.upper().strip()
+            try:
+                if "MB" in t:
+                    total_mb += float(t.replace("MB", "").strip())
+                elif "KB" in t:
+                    total_mb += float(t.replace("KB", "").strip()) / 1024.0
+                elif "GB" in t:
+                    total_mb += float(t.replace("GB", "").strip()) * 1024.0
+            except ValueError:
+                total_mb += 1.0
+    return round(total_mb, 2)
 
 
 def create_documento(

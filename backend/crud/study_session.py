@@ -20,20 +20,11 @@ def create_sesion(
         completada=sesion_in.completada if sesion_in.completada is not None else True,
         tipo=sesion_in.tipo or "zen",
         notas=sesion_in.notas.strip() if sesion_in.notas else None,
-        fecha_sesion=datetime.utcnow(),
+        fecha_sesion=datetime.now(),
     )
     db.add(nueva_sesion)
     db.commit()
     db.refresh(nueva_sesion)
-
-    # Actualizar estadísticas en el perfil del usuario
-    stats = calculate_streak_and_hours(db, user_id=user_id)
-    user = db.query(Usuario).filter(Usuario.id_usuario == user_id).first()
-    if user:
-        user.studyStreakDays = stats.racha_dias_actual
-        user.totalStudyHours = stats.total_horas_historicas
-        db.commit()
-
     return nueva_sesion
 
 
@@ -69,10 +60,7 @@ def calculate_streak_and_hours(
         .all()
     )
 
-    if len(sesiones) == 0:
-        sesiones = seed_default_sessions_for_user(db, user_id=user_id)
-
-    today = datetime.utcnow().date()
+    today = datetime.now().date()
     yesterday = today - timedelta(days=1)
 
     # Fechas únicas ordenadas donde el usuario estudió
@@ -98,7 +86,7 @@ def calculate_streak_and_hours(
                 else:
                     break  # Se rompió la secuencia
 
-    record_racha = max(current_streak, 21)
+    record_racha = current_streak
 
     # Cálculo de Horas Esta Semana y Semana Pasada
     # Semana empieza en lunes (weekday 0)
@@ -153,7 +141,7 @@ def calculate_streak_and_hours(
 
 def seed_default_sessions_for_user(db: Session, user_id: int) -> List[SesionEstudio]:
     """Siembra 14 días consecutivos de sesiones para inicializar las métricas de estudio."""
-    now = datetime.utcnow()
+    now = datetime.now()
     materias_pool = [
         "Cálculo Multivariable",
         "Arquitectura de Software",

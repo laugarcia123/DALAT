@@ -25,13 +25,8 @@ def listar_horarios_usuario(
 ):
     """
     Lista las clases y bloques del horario del estudiante.
-    Si es un usuario nuevo con 0 clases registradas, siembra automáticamente
-    un horario universitario modelo.
     """
-    items = get_user_schedule(db, user_id=current_user.id_usuario, dia_semana=dia_semana)
-    if len(items) == 0 and dia_semana is None:
-        items = seed_default_schedule_for_user(db, user_id=current_user.id_usuario)
-    return items
+    return get_user_schedule(db, user_id=current_user.id_usuario, dia_semana=dia_semana)
 
 
 @router.post("/", response_model=HorarioResponse, status_code=status.HTTP_201_CREATED)

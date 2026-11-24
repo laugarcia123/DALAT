@@ -16,15 +16,37 @@ router = APIRouter(prefix="/sesiones", tags=["Sesiones de Estudio & Modo Zen"])
 
 @router.get("/stats", response_model=SesionStats)
 def obtener_estadisticas_estudio(
-    meta_horas: float = Query(40.0, ge=1.0, le=100.0, description="Meta semanal de horas de estudio"),
+    meta_horas: Optional[float] = Query(None, ge=1.0, le=100.0, description="Meta semanal de horas de estudio"),
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Calcula en tiempo real la racha activa de días consecutivos,
     las horas estudiadas esta semana, semana anterior y avance hacia la meta.
+    Si no se envía meta_horas, utiliza la guardada en el perfil del usuario en la BD.
     """
-    return calculate_streak_and_hours(db, user_id=current_user.id_usuario, meta_semanal_horas=meta_horas)
+    user_id = current_user.id_usuario
+    
+    # Si no se pasó explícitamente por query param, leer la meta guardada en la base de datos
+    if meta_horas is None:
+        meta_horas = float(getattr(current_user, "meta_semanal_horas", 40) or 40.0)
+
+    return calculate_streak_and_hours(db, user_id=user_id, meta_semanal_horas=meta_horas)
+
+
+@router.put("/meta-semanal")
+def actualizar_meta_semanal(
+    meta_horas: int = Query(..., ge=1, le=100, description="Nueva meta de horas semanales"),
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Persiste en la tabla usuarios de PostgreSQL la meta semanal de horas elegida por el estudiante.
+    """
+    current_user.meta_semanal_horas = meta_horas
+    db.commit()
+    db.refresh(current_user)
+    return {"meta_semanal_horas": meta_horas, "status": "ok"}
 
 
 @router.get("/", response_model=List[SesionResponse])
@@ -44,7 +66,7 @@ def registrar_sesion_estudio(
     db: Session = Depends(get_db),
 ):
     """
-    Registra una sesión de estudio (Pomodoro, Modo Zen o libre).
+    Registra una sesión de estudio (Pomodoro, Modo Zen, Repetición Espaciada, Recuerdo Activo o Psicópata).
     Actualiza automáticamente la racha activa y las horas de estudio del estudiante.
     """
     return create_sesion(db, sesion_in=sesion_in, user_id=current_user.id_usuario)

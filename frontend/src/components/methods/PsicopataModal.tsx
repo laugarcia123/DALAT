@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
+import { repositoryService, DocumentoItem, EquipoItem } from "@/services/repositoryService";
+import { studySessionService } from "@/services/studySessionService";
 import {
   X,
   Play,
@@ -17,6 +19,7 @@ import {
   Sparkles,
   CheckCircle2,
   ArrowRight,
+  ArrowLeft,
   Skull,
   FileText,
   Check,
@@ -30,6 +33,10 @@ import {
   Lock,
   XCircle,
   Coins,
+  Folder,
+  Users,
+  Link2,
+  FileArchive,
 } from "lucide-react";
 
 interface PsicopataModalProps {
@@ -40,6 +47,7 @@ interface PsicopataModalProps {
   onGoToCheckout?: () => void;
   tokensBalance?: number;
   onDeductTokens?: (amount: number) => void;
+  onSessionCompleted?: () => void;
 }
 
 export interface MaterialFile {
@@ -47,7 +55,9 @@ export interface MaterialFile {
   name: string;
   subject: string;
   size: string;
-  type: "pdf" | "docx" | "txt";
+  type: "pdf" | "docx" | "txt" | "ppt" | "link" | "zip";
+  isLink?: boolean;
+  isArchive?: boolean;
   isLocal?: boolean;
   previewText?: string;
 }
@@ -569,6 +579,7 @@ export default function PsicopataModal({
   onGoToCheckout,
   tokensBalance = 0,
   onDeductTokens,
+  onSessionCompleted,
 }: PsicopataModalProps) {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showExplanation, setShowExplanation] = useState<boolean>(false);
@@ -577,8 +588,13 @@ export default function PsicopataModal({
   // Control de paywall para usuarios gratuitos y feedback de validación
   const [showFreePaywall, setShowFreePaywall] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isRepoExplorerOpen, setIsRepoExplorerOpen] = useState<boolean>(false);
+  const [explorerSearch, setExplorerSearch] = useState<string>("");
+  const [equipos, setEquipos] = useState<EquipoItem[]>([]);
+  const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
+  const [repoFilterTab, setRepoFilterTab] = useState<"equipos" | "personal">("equipos");
 
-  // Materiales cargados desde Recursos IA
+  // Materiales cargados desde Recursos IA y Repositorio
   const [materials, setMaterials] = useState<MaterialFile[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -595,7 +611,13 @@ export default function PsicopataModal({
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>(() => materials[0]?.id || "f1");
   const selectedMaterial = materials.find((m) => m.id === selectedMaterialId) || materials[0] || DEFAULT_MATERIALS[0];
 
-  // Filtrado de materiales para búsqueda fluida
+  // Mostrar únicamente los 3 documentos más recientes en la vista rápida
+  const recentMaterials = materials.slice(0, 3);
+  const displayedQuickMaterials = recentMaterials.some((m) => m.id === selectedMaterialId)
+    ? recentMaterials
+    : [selectedMaterial, ...recentMaterials.slice(0, 2)];
+
+  // Filtrado de materiales para el modal explorador completo
   const filteredMaterials = materials.filter((m) => {
     if (!resourceSearch.trim()) return true;
     const query = resourceSearch.toLowerCase();
@@ -626,7 +648,7 @@ export default function PsicopataModal({
   const [bestStreakRecord, setBestStreakRecord] = useState<number>(0);
   const [psicopataVictories, setPsicopataVictories] = useState<number>(0);
 
-  // Cargar records desde localStorage
+  // Cargar records y repositorios reales desde el backend
   useEffect(() => {
     if (typeof window !== "undefined") {
       const rec = parseInt(localStorage.getItem("dalat_psicopata_best_streak") || "0", 10);
@@ -634,16 +656,94 @@ export default function PsicopataModal({
       setBestStreakRecord(rec);
       setPsicopataVictories(vic);
 
-      // Recargar materiales por si subieron uno nuevo recientemente
-      try {
-        const saved = localStorage.getItem("dalat_ai_materials");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setMaterials(parsed);
-          }
-        }
-      } catch {}
+      // Cargar repositorios reales desde PostgreSQL
+      if (isOpen) {
+        repositoryService
+          .getEquipos()
+          .then((data) => {
+            if (Array.isArray(data)) {
+              setEquipos(data);
+              // Aplanar documentos de todos los repositorios para la selección rápida de recientes
+              const allDocs: MaterialFile[] = [];
+              data.forEach((eq) => {
+                (eq.documentos || []).forEach((d) => {
+                  const fmt = (d.formato || "").toUpperCase();
+                  const docNameLower = d.nombre.toLowerCase();
+                  const isLink =
+                    fmt === "LINK" ||
+                    fmt === "NOTION" ||
+                    d.tamano === "Enlace" ||
+                    Boolean(d.url_recurso?.startsWith("http")) ||
+                    docNameLower.startsWith("http");
+
+                  const isArchive =
+                    fmt === "ZIP" ||
+                    fmt === "RAR" ||
+                    fmt === "7Z" ||
+                    fmt === "TAR" ||
+                    fmt === "GZ" ||
+                    fmt.includes("ZIP") ||
+                    fmt.includes("RAR") ||
+                    docNameLower.endsWith(".zip") ||
+                    docNameLower.endsWith(".rar") ||
+                    docNameLower.endsWith(".7z") ||
+                    docNameLower.endsWith(".tar") ||
+                    docNameLower.endsWith(".gz") ||
+                    docNameLower.endsWith(".tgz");
+
+                  const isDocx =
+                    fmt.includes("DOC") ||
+                    fmt.includes("WORD") ||
+                    docNameLower.endsWith(".docx") ||
+                    docNameLower.endsWith(".doc");
+
+                  const isPpt =
+                    fmt.includes("PPT") ||
+                    docNameLower.endsWith(".pptx") ||
+                    docNameLower.endsWith(".ppt");
+
+                  const isTxt =
+                    fmt.includes("TXT") ||
+                    fmt.includes("MD") ||
+                    docNameLower.endsWith(".txt") ||
+                    docNameLower.endsWith(".md");
+
+                  allDocs.push({
+                    id: `doc_${d.id_documento}`,
+                    name: d.nombre,
+                    subject: eq.nombre,
+                    size: d.tamano || "1.0 MB",
+                    type: isLink
+                      ? "link"
+                      : isArchive
+                      ? "zip"
+                      : isDocx
+                      ? "docx"
+                      : isTxt
+                      ? "txt"
+                      : isPpt
+                      ? "ppt"
+                      : "pdf",
+                    isLink,
+                    isArchive,
+                    previewText: d.descripcion || d.nombre,
+                  });
+                });
+              });
+              // Para la selección rápida inicial, excluir enlaces y archivos comprimidos
+              const playableDocs = allDocs.filter((d) => !d.isLink && !d.isArchive);
+              if (playableDocs.length > 0) {
+                setMaterials(playableDocs);
+                setSelectedMaterialId((prev) =>
+                  prev && playableDocs.some((m) => m.id === prev) ? prev : playableDocs[0].id
+                );
+              }
+            }
+          })
+          .catch((err) =>
+            console.warn("Error cargando repositorios en PsicopataModal:", err)
+          );
+      }
     }
   }, [isOpen]);
 
@@ -702,6 +802,19 @@ export default function PsicopataModal({
 
       // Verificar si completó todas sin error
       if (currentIndex + 1 >= cardCountGoal) {
+        // Registrar sesión de estudio completada para sumar a la racha diaria
+        studySessionService.logSession({
+          duracion_segundos: 15 * 60,
+          materia: selectedMaterial?.subject || "Método Psicópata",
+          completada: true,
+          tipo: "psicopata",
+          notas: `Desafío Psicópata completado con éxito: ${cardCountGoal} preguntas perfectas`,
+        }).then(() => {
+          onSessionCompleted?.();
+        }).catch((err) => {
+          console.error("Error al registrar sesión de Método Psicópata:", err);
+        });
+
         setTimeout(() => {
           setGameStage("victory");
           confetti({
@@ -848,126 +961,100 @@ export default function PsicopataModal({
             <div className="space-y-7 sm:space-y-8 animate-in fade-in duration-200 max-w-3xl mx-auto py-2">
               {/* 1. Seleccionar archivo de Recursos IA */}
               <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <label
-                      className={`text-xs font-bold uppercase tracking-wider block ${
-                        isLightMode ? "text-slate-800" : "text-slate-200"
-                      }`}
-                    >
-                      1. Elige el recurso de estudio:
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <label
+                        className={`text-xs font-bold uppercase tracking-wider block ${
+                          isLightMode ? "text-slate-800" : "text-slate-200"
+                        }`}
+                      >
+                        1. Elige el recurso de estudio:
+                      </label>
+                      <span className="text-[10px] font-semibold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                        Recientes
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Las tarjetas se generarán con base en este documento
+                      Mostrando los 3 documentos más recientes de tus repositorios
                     </p>
                   </div>
-
-                  {/* Barra de búsqueda interactiva */}
-                  <div className="relative w-full sm:w-64">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={resourceSearch}
-                      onChange={(e) => setResourceSearch(e.target.value)}
-                      placeholder="Buscar recurso..."
-                      className={`w-full text-xs pl-8 pr-7 py-2 rounded-xl border transition-colors outline-none ${
-                        isLightMode
-                          ? "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-red-400 focus:ring-1 focus:ring-red-400/30"
-                          : "bg-white/[0.04] border-white/[0.1] text-white placeholder-slate-500 focus:border-red-500/60"
-                      }`}
-                    />
-                    {resourceSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setResourceSearch("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
                 </div>
 
-                {/* Contenedor scrolleable con tarjetas espaciosas */}
-                <div className="max-h-52 overflow-y-auto pr-1">
-                  {filteredMaterials.length === 0 ? (
-                    <div
-                      className={`p-6 rounded-2xl text-center text-xs border ${
-                        isLightMode
-                          ? "bg-slate-50 border-slate-200 text-slate-500"
-                          : "bg-white/[0.02] border-white/[0.06] text-slate-400"
-                      }`}
-                    >
-                      No se encontró ningún recurso con &quot;{resourceSearch}&quot;.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {filteredMaterials.map((mat) => {
-                        const isSelected = selectedMaterialId === mat.id;
-                        return (
-                          <div
-                            key={mat.id}
-                            onClick={() => setSelectedMaterialId(mat.id)}
-                            className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative select-none flex items-center justify-between gap-3 ${
-                              isSelected
-                                ? isLightMode
-                                  ? "bg-red-50/80 border-red-500 ring-2 ring-red-400/30 shadow-sm"
-                                  : "bg-red-950/40 border-red-500 ring-2 ring-red-500/30 shadow-sm"
-                                : isLightMode
-                                ? "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 hover:border-slate-300 shadow-sm"
-                                : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-300 hover:border-white/[0.15]"
+                {/* Contenedor con las 3 tarjetas de documentos recientes */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {displayedQuickMaterials.map((mat) => {
+                    const isSelected = selectedMaterialId === mat.id;
+                    return (
+                      <div
+                        key={mat.id}
+                        onClick={() => setSelectedMaterialId(mat.id)}
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative select-none flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? isLightMode
+                              ? "bg-red-50/80 border-red-500 ring-2 ring-red-400/30 shadow-sm"
+                              : "bg-red-950/40 border-red-500 ring-2 ring-red-500/30 shadow-sm"
+                            : isLightMode
+                            ? "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 hover:border-slate-300 shadow-sm"
+                            : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-300 hover:border-white/[0.15]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span
+                            className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 ${
+                              mat.type === "pdf"
+                                ? "bg-rose-500/15 text-rose-600 border border-rose-500/25"
+                                : mat.type === "docx"
+                                ? "bg-blue-500/15 text-blue-600 border border-blue-500/25"
+                                : mat.type === "ppt"
+                                ? "bg-amber-500/15 text-amber-600 border border-amber-500/25"
+                                : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25"
                             }`}
                           >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <span
-                                className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 ${
-                                  mat.type === "pdf"
-                                    ? "bg-rose-500/15 text-rose-600 border border-rose-500/25"
-                                    : mat.type === "docx"
-                                    ? "bg-blue-500/15 text-blue-600 border border-blue-500/25"
-                                    : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25"
-                                }`}
-                              >
-                                {mat.type}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs font-bold truncate leading-snug" title={mat.name}>
-                                  {mat.name}
-                                </h4>
-                                <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                                  {mat.subject} • {mat.size}
-                                </p>
-                              </div>
-                            </div>
-                            {isSelected ? (
-                              <div className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                                <Check className="w-3 h-3 stroke-[3]" />
-                              </div>
-                            ) : (
-                              <div
-                                className={`w-4 h-4 rounded-full border shrink-0 ${
-                                  isLightMode ? "border-slate-300" : "border-slate-700"
-                                }`}
-                              />
-                            )}
+                            {mat.type.toUpperCase()}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-xs font-bold truncate leading-snug" title={mat.name}>
+                              {mat.name}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                              {mat.subject} • {mat.size}
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        </div>
+                        {isSelected ? (
+                          <div className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        ) : (
+                          <div
+                            className={`w-4 h-4 rounded-full border shrink-0 ${
+                              isLightMode ? "border-slate-300" : "border-slate-700"
+                            }`}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Detalle del archivo seleccionado y contador */}
+                {/* Detalle del archivo seleccionado y botón para abrir todos */}
                 <div className="flex items-center justify-between text-xs px-1 text-slate-400 pt-1">
-                  <span className="truncate">
+                  <span className="truncate max-w-[280px] sm:max-w-[420px]">
                     Seleccionado:{" "}
                     <span className={`font-semibold ${isLightMode ? "text-slate-800" : "text-slate-200"}`}>
                       {selectedMaterial?.name || "Ninguno"}
                     </span>
                   </span>
-                  <span className="shrink-0 text-[11px]">
-                    {filteredMaterials.length} de {materials.length} recursos
-                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsRepoExplorerOpen(true)}
+                    className="text-red-500 hover:text-red-400 font-semibold text-xs inline-flex items-center gap-1 hover:underline cursor-pointer shrink-0"
+                  >
+                    <span>Explorar repositorios ({materials.length})</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
 
@@ -1691,6 +1778,437 @@ export default function PsicopataModal({
                 >
                   <span>Comprar Plan PRO para jugar el desafío</span>
                   <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 5. MODAL: EXPLORADOR DE REPOSITORIOS (SELECCIÓN CÓMODA) */}
+        {/* ======================================================== */}
+        {isRepoExplorerOpen && (
+          <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+            <div
+              className={`w-full max-w-3xl max-h-[88vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
+                isLightMode ? "bg-white border-slate-200 shadow-slate-900/15" : "bg-[#0d1020] border-[#22294c] shadow-black/90"
+              }`}
+            >
+              {/* Header */}
+              <div className={`p-5 sm:p-6 border-b flex items-center justify-between gap-4 ${isLightMode ? "border-slate-100" : "border-white/[0.08]"}`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/25 text-red-500 flex items-center justify-center shrink-0">
+                    <Folder className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className={`text-base font-bold ${isLightMode ? "text-slate-900" : "text-white"}`}>
+                      {selectedRepoId === null ? "Explorador de Repositorios" : (equipos.find((e) => e.id_equipo === selectedRepoId)?.nombre || "Documentos del Repositorio")}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      {selectedRepoId === null
+                        ? "Selecciona un repositorio para ver y elegir tus archivos de estudio"
+                        : "Elige un archivo de este repositorio para el desafío de flashcards"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {selectedRepoId !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRepoId(null)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        isLightMode
+                          ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                          : "bg-white/10 hover:bg-white/15 text-slate-200"
+                      }`}
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Volver a repositorios</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRepoExplorerOpen(false);
+                      setSelectedRepoId(null);
+                    }}
+                    className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* VISTA 1: LISTADO DE REPOSITORIOS (NIVEL 1) */}
+              {selectedRepoId === null ? (
+                <div className="p-5 sm:p-6 overflow-y-auto max-h-[520px] space-y-5">
+                  {/* Píldoras de Filtro: Equipos de Estudio vs Apuntes Personales */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRepoFilterTab("equipos")}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        repoFilterTab === "equipos"
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                          : isLightMode
+                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          : "bg-white/[0.05] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Equipos de Estudio</span>
+                      <span className="w-4 h-4 rounded-full text-[10px] bg-white/20 flex items-center justify-center font-bold">
+                        {equipos.filter((e) => !e.es_personal).length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRepoFilterTab("personal")}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        repoFilterTab === "personal"
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                          : isLightMode
+                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          : "bg-white/[0.05] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <Folder className="w-3.5 h-3.5" />
+                      <span>Apuntes Personales</span>
+                      <span className="w-4 h-4 rounded-full text-[10px] bg-white/20 flex items-center justify-center font-bold">
+                        {equipos.filter((e) => e.es_personal).length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Cuadros de Repositorios en Grilla */}
+                  {equipos.filter((e) => (repoFilterTab === "personal" ? e.es_personal : !e.es_personal)).length === 0 ? (
+                    <div
+                      className={`rounded-2xl border p-10 text-center space-y-3 ${
+                        isLightMode ? "bg-slate-50 border-slate-200" : "bg-white/[0.02] border-white/[0.06]"
+                      }`}
+                    >
+                      <Folder className="w-8 h-8 text-slate-400 mx-auto opacity-50" />
+                      <p className="text-xs font-semibold text-slate-400">
+                        No tienes repositorios en esta sección aún.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {equipos
+                        .filter((e) => (repoFilterTab === "personal" ? e.es_personal : !e.es_personal))
+                        .map((team) => {
+                          const totalDocs = team.documentos?.length || team.documentos_count || 0;
+                          return (
+                            <div
+                              key={team.id_equipo}
+                              onClick={() => setSelectedRepoId(team.id_equipo)}
+                              className={`group rounded-2xl border p-5 flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-1 ${
+                                isLightMode
+                                  ? "bg-white border-slate-200/90 shadow-sm hover:shadow-md hover:border-purple-300"
+                                  : "bg-[#0c0e18] border-[#171c2f] hover:border-[#2f385c] hover:bg-[#0f1220]"
+                              }`}
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-sm"
+                                    style={{ backgroundColor: team.color || "#7c5dfa" }}
+                                  >
+                                    {team.icono_iniciales || "EQ"}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span
+                                      className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
+                                      style={{
+                                        backgroundColor: `${team.color || "#7c5dfa"}15`,
+                                        color: team.color || "#7c5dfa",
+                                        border: `1px solid ${team.color || "#7c5dfa"}35`,
+                                      }}
+                                    >
+                                      {team.materia || "GENERAL"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4
+                                    className={`text-base font-bold tracking-tight truncate ${
+                                      isLightMode ? "text-slate-900 group-hover:text-purple-600" : "text-white group-hover:text-purple-400"
+                                    }`}
+                                  >
+                                    {team.nombre}
+                                  </h4>
+                                  <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">
+                                    {team.descripcion || (team.es_personal ? "Notas personales privadas" : `Equipo de estudio colaborativo para ${team.materia}`)}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
+                                  <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg">
+                                    <Users className="w-3.5 h-3.5 text-indigo-400" />
+                                    <span>
+                                      {team.miembros_count || 1} {(team.miembros_count || 1) === 1 ? "miembro" : "miembros"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg">
+                                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>
+                                      {totalDocs} {totalDocs === 1 ? "material" : "materiales"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-semibold text-purple-400 group-hover:text-purple-300">
+                                <span>Ver y elegir materiales</span>
+                                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* VISTA 2: DOCUMENTOS DENTRO DEL REPOSITORIO SELECCIONADO (NIVEL 2) */
+                <div className="p-5 sm:p-6 overflow-y-auto max-h-[520px] space-y-4">
+                  {/* Buscador dentro del repositorio */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={explorerSearch}
+                      onChange={(e) => setExplorerSearch(e.target.value)}
+                      placeholder="Buscar archivo en este repositorio..."
+                      className={`w-full text-xs pl-10 pr-8 py-2.5 rounded-xl border transition-colors outline-none ${
+                        isLightMode
+                          ? "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-red-400"
+                          : "bg-[#090b16] border-[#1f2644] text-white placeholder-slate-500 focus:border-red-500/60"
+                      }`}
+                    />
+                    {explorerSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setExplorerSearch("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Lista de Documentos del Repositorio */}
+                  {(() => {
+                    const currentRepo = equipos.find((e) => e.id_equipo === selectedRepoId);
+                    const docs = currentRepo?.documentos || [];
+                    const filteredDocs = docs.filter((d) =>
+                      !explorerSearch.trim() || d.nombre.toLowerCase().includes(explorerSearch.toLowerCase())
+                    );
+
+                    if (filteredDocs.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+                          <FileText className="w-8 h-8 mx-auto opacity-40 text-red-400" />
+                          <p className="font-semibold text-slate-300">No hay documentos en este repositorio</p>
+                          <p className="text-[11px] text-slate-500">
+                            Sube guías o diapositivas en la pestaña Repositorio para poder utilizarlos con el Método Psicópata.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2.5">
+                        {filteredDocs.map((doc) => {
+                          const fmt = (doc.formato || "").toUpperCase();
+                          const docNameLower = doc.nombre.toLowerCase();
+                          const isLink =
+                            fmt === "LINK" ||
+                            fmt === "NOTION" ||
+                            doc.tamano === "Enlace" ||
+                            Boolean(doc.url_recurso?.startsWith("http")) ||
+                            docNameLower.startsWith("http");
+
+                          const isArchive =
+                            fmt === "ZIP" ||
+                            fmt === "RAR" ||
+                            fmt === "7Z" ||
+                            fmt === "TAR" ||
+                            fmt === "GZ" ||
+                            fmt.includes("ZIP") ||
+                            fmt.includes("RAR") ||
+                            docNameLower.endsWith(".zip") ||
+                            docNameLower.endsWith(".rar") ||
+                            docNameLower.endsWith(".7z") ||
+                            docNameLower.endsWith(".tar") ||
+                            docNameLower.endsWith(".gz") ||
+                            docNameLower.endsWith(".tgz");
+
+                          const isSelected = selectedMaterialId === `doc_${doc.id_documento}` || selectedMaterial?.name === doc.nombre;
+
+                          // Caso 1: ENLACES WEB Y ARCHIVOS COMPRIMIDOS (NO disponibles para IA ni Método Psicópata)
+                          if (isLink || isArchive) {
+                            return (
+                              <div
+                                key={doc.id_documento}
+                                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 opacity-50 cursor-not-allowed select-none ${
+                                  isLightMode
+                                    ? "bg-slate-100/70 border-slate-200 text-slate-500"
+                                    : "bg-white/[0.02] border-white/[0.06] text-slate-400"
+                                }`}
+                                title={
+                                  isArchive
+                                    ? "Los archivos comprimidos (.zip, .rar) no están disponibles para generar recursos con IA ni Método Psicópata."
+                                    : "Los enlaces web no están disponibles para generar recursos con IA ni Método Psicópata."
+                                }
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <span
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 flex items-center gap-1 ${
+                                      isArchive
+                                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                                        : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                    }`}
+                                  >
+                                    {isArchive ? <FileArchive className="w-3 h-3" /> : <Link2 className="w-3 h-3" />}
+                                    <span>{isArchive ? "ZIP" : "ENLACE"}</span>
+                                  </span>
+                                  <div className="min-w-0">
+                                    <h5 className="text-xs sm:text-sm font-semibold truncate line-through">
+                                      {doc.nombre}
+                                    </h5>
+                                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                      {isArchive
+                                        ? "Archivo comprimido (ZIP/RAR) • No ejecutable"
+                                        : "Enlace web o Google Drive • Solo lectura"}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <span className="text-[10px] font-semibold text-amber-500/90 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg shrink-0">
+                                  No disponible para IA
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          // Caso 2: DOCUMENTOS REALES (PDF, DOCX, TXT, PPT) -> Elegibles
+                          const docType: "pdf" | "docx" | "txt" | "ppt" =
+                            fmt.includes("DOC") ||
+                            fmt.includes("WORD") ||
+                            doc.nombre.toLowerCase().endsWith(".docx") ||
+                            doc.nombre.toLowerCase().endsWith(".doc")
+                              ? "docx"
+                              : fmt.includes("TXT") ||
+                                fmt.includes("MD") ||
+                                doc.nombre.toLowerCase().endsWith(".txt") ||
+                                doc.nombre.toLowerCase().endsWith(".md")
+                              ? "txt"
+                              : fmt.includes("PPT") ||
+                                doc.nombre.toLowerCase().endsWith(".pptx") ||
+                                doc.nombre.toLowerCase().endsWith(".ppt")
+                              ? "ppt"
+                              : "pdf";
+
+                          return (
+                            <div
+                              key={doc.id_documento}
+                              onClick={() => {
+                                const chosen: MaterialFile = {
+                                  id: `doc_${doc.id_documento}`,
+                                  name: doc.nombre,
+                                  subject: currentRepo?.nombre || "Repositorio Académico",
+                                  size: doc.tamano || "1.0 MB",
+                                  type: docType,
+                                  isLink: false,
+                                  isArchive: false,
+                                  previewText: doc.descripcion || doc.nombre,
+                                };
+                                setMaterials((prev) => [chosen, ...prev.filter((m) => m.id !== chosen.id)]);
+                                setSelectedMaterialId(chosen.id);
+                                setIsRepoExplorerOpen(false);
+                                setSelectedRepoId(null);
+                              }}
+                              className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                isSelected
+                                  ? isLightMode
+                                    ? "bg-red-50/80 border-red-500 ring-2 ring-red-400/30 shadow-sm"
+                                    : "bg-red-950/40 border-red-500 ring-2 ring-red-500/30 shadow-sm"
+                                  : isLightMode
+                                  ? "bg-white hover:bg-slate-50 border-slate-200/80 text-slate-800 hover:border-slate-300"
+                                  : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-200 hover:border-white/[0.15]"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase shrink-0 ${
+                                    docType === "pdf"
+                                      ? "bg-rose-500/15 text-rose-600 border border-rose-500/25"
+                                      : docType === "docx"
+                                      ? "bg-blue-500/15 text-blue-600 border border-blue-500/25"
+                                      : docType === "ppt"
+                                      ? "bg-amber-500/15 text-amber-600 border border-amber-500/25"
+                                      : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25"
+                                  }`}
+                                >
+                                  {docType.toUpperCase()}
+                                </span>
+
+                                <div className="min-w-0">
+                                  <h4 className="text-xs sm:text-sm font-bold truncate">{doc.nombre}</h4>
+                                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                    {currentRepo?.nombre} &bull; {doc.tamano || "1.0 MB"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {isSelected ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-bold text-red-500 bg-red-500/10 px-2.5 py-1 rounded-lg border border-red-500/20">
+                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                    <span>Seleccionado</span>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-xl border transition cursor-pointer ${
+                                      isLightMode
+                                        ? "text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border-red-200"
+                                        : "text-red-300 hover:text-white bg-red-500/15 hover:bg-red-500/25 border-red-500/30"
+                                    }`}
+                                  >
+                                    Elegir
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className={`p-4 sm:p-5 border-t flex items-center justify-between text-xs text-slate-400 ${isLightMode ? "border-slate-100 bg-slate-50/50" : "border-white/[0.08] bg-black/20"}`}>
+                <span>
+                  {selectedRepoId === null
+                    ? `${equipos.length} repositorios creados`
+                    : `Mostrando materiales de ${(equipos.find((e) => e.id_equipo === selectedRepoId)?.nombre) || "repositorio"}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRepoExplorerOpen(false);
+                    setSelectedRepoId(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold transition cursor-pointer"
+                >
+                  Cerrar
                 </button>
               </div>
             </div>

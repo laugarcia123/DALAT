@@ -55,260 +55,7 @@ interface SubjectItem {
   cortes: Corte[];
 }
 
-const INITIAL_SUBJECTS: SubjectItem[] = [
-  {
-    id: "calculo-3",
-    name: "Cálculo III",
-    evaluationsText: "3 cortes · 5 evaluaciones registradas",
-    cortes: [
-      {
-        id: "c1",
-        name: "1er Corte",
-        weight: 30,
-        evaluations: [
-          {
-            id: "e1",
-            name: "Tarea 1 — Límites",
-            date: "28 feb",
-            type: "Tarea",
-            grade: 9.5,
-            maxGrade: 10,
-            weight: 30,
-          },
-          {
-            id: "e2",
-            name: "Tarea 2 — Derivadas",
-            date: "10 mar",
-            type: "Tarea",
-            grade: 8.8,
-            maxGrade: 10,
-            weight: 30,
-          },
-          {
-            id: "e3",
-            name: "Primer parcial",
-            date: "15 mar",
-            type: "Examen",
-            grade: 8.2,
-            maxGrade: 10,
-            weight: 40,
-          },
-        ],
-      },
-      {
-        id: "c2",
-        name: "2do Corte",
-        weight: 35,
-        evaluations: [
-          {
-            id: "e4",
-            name: "Taller de Integrales",
-            date: "4 abr",
-            type: "Tarea",
-            grade: 8.5,
-            maxGrade: 10,
-            weight: 40,
-          },
-          {
-            id: "e5",
-            name: "Segundo parcial",
-            date: "22 abr",
-            type: "Examen",
-            grade: 8.1,
-            maxGrade: 10,
-            weight: 60,
-          },
-        ],
-      },
-      {
-        id: "c3",
-        name: "3er Corte",
-        weight: 35,
-        evaluations: [],
-      },
-    ],
-  },
-  {
-    id: "economia",
-    name: "Economía",
-    evaluationsText: "3 cortes · 3 evaluaciones",
-    cortes: [
-      {
-        id: "ec1",
-        name: "1er Corte",
-        weight: 30,
-        evaluations: [
-          {
-            id: "ee1",
-            name: "Control de Lectura Cap 1-3",
-            date: "5 mar",
-            type: "Tarea",
-            grade: 7.5,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "ec2",
-        name: "2do Corte",
-        weight: 35,
-        evaluations: [
-          {
-            id: "ee2",
-            name: "Parcial Microeconomía",
-            date: "12 abr",
-            type: "Examen",
-            grade: 8.3,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "ec3",
-        name: "3er Corte",
-        weight: 35,
-        evaluations: [],
-      },
-    ],
-  },
-  {
-    id: "quimica",
-    name: "Química Orgánica",
-    evaluationsText: "3 cortes · 4 evaluaciones",
-    cortes: [
-      {
-        id: "qc1",
-        name: "1er Corte",
-        weight: 30,
-        evaluations: [
-          {
-            id: "qe1",
-            name: "Práctica de Laboratorio 1",
-            date: "2 mar",
-            type: "Tarea",
-            grade: 9.1,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "qc2",
-        name: "2do Corte",
-        weight: 35,
-        evaluations: [
-          {
-            id: "qe2",
-            name: "Parcial Reacciones",
-            date: "18 abr",
-            type: "Examen",
-            grade: 8.9,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "qc3",
-        name: "3er Corte",
-        weight: 35,
-        evaluations: [],
-      },
-    ],
-  },
-  {
-    id: "arquitectura",
-    name: "Arquitectura de Software",
-    evaluationsText: "3 cortes · 3 evaluaciones",
-    cortes: [
-      {
-        id: "ac1",
-        name: "1er Corte",
-        weight: 30,
-        evaluations: [
-          {
-            id: "ae1",
-            name: "Diagrama C4 y Patrones",
-            date: "10 mar",
-            type: "Tarea",
-            grade: 8.8,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "ac2",
-        name: "2do Corte",
-        weight: 35,
-        evaluations: [
-          {
-            id: "ae2",
-            name: "Parcial Arquitectura",
-            date: "24 abr",
-            type: "Examen",
-            grade: 8.7,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "ac3",
-        name: "3er Corte",
-        weight: 35,
-        evaluations: [],
-      },
-    ],
-  },
-  {
-    id: "historia",
-    name: "Historia Universal",
-    evaluationsText: "3 cortes · 3 evaluaciones",
-    cortes: [
-      {
-        id: "hc1",
-        name: "1er Corte",
-        weight: 30,
-        evaluations: [
-          {
-            id: "he1",
-            name: "Ensayo Guerra Fría",
-            date: "8 mar",
-            type: "Tarea",
-            grade: 6.9,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "hc2",
-        name: "2do Corte",
-        weight: 35,
-        evaluations: [
-          {
-            id: "he2",
-            name: "Examen Parcial Siglo XX",
-            date: "19 abr",
-            type: "Examen",
-            grade: 7.5,
-            maxGrade: 10,
-            weight: 100,
-          },
-        ],
-      },
-      {
-        id: "hc3",
-        name: "3er Corte",
-        weight: 35,
-        evaluations: [],
-      },
-    ],
-  },
-];
+const INITIAL_SUBJECTS: SubjectItem[] = [];
 
 interface CalcRow {
   id: string;
@@ -472,24 +219,31 @@ export default function NotesTab({ isLightMode = false }: NotesTabProps) {
 
   // Carga inicial y sincronización con el backend
   const loadSubjectsFromBackend = async () => {
-    if (!getStoredToken()) return;
+    if (!getStoredToken()) {
+      setSubjects([]);
+      return;
+    }
     setIsLoadingSubjects(true);
     try {
       const list = await subjectService.getSubjects();
-      if (list && list.length > 0) {
+      if (list && Array.isArray(list)) {
         const mapped = list.map(mapBackendSubjectToItem);
         setSubjects(mapped);
+      } else {
+        setSubjects([]);
       }
     } catch (err) {
       console.warn("[NotesTab] Error al cargar asignaturas del backend:", err);
+      setSubjects([]);
     } finally {
       setIsLoadingSubjects(false);
     }
   };
 
   useEffect(() => {
+    setSubjects([]);
     loadSubjectsFromBackend();
-  }, [user]);
+  }, [user?.email, user?.id]);
 
   // Quick calculator state
   const [calcRows, setCalcRows] = useState<CalcRow[]>([
@@ -1591,8 +1345,28 @@ Fecha</label>
         </div>
       </div>
 
-      {/* 6 Cards Grid (5 subjects + 1 quick calculator) */}
+      {/* 6 Cards Grid (subjects + quick calculator) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {subjects.length === 0 && (
+          <div className={`p-8 rounded-2xl border text-center flex flex-col items-center justify-center space-y-3 col-span-1 md:col-span-2 ${activeLight ? "bg-white border-slate-200/90 shadow-xs" : "bg-[#0c0e18] border-[#171c2f]"}`}>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${activeLight ? "bg-purple-50 text-purple-600 border-purple-200" : "bg-purple-900/30 text-purple-300 border-purple-700/40"}`}>
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <h4 className={`text-base font-bold ${activeLight ? "text-slate-900" : "text-white"}`}>
+              No tienes asignaturas registradas
+            </h4>
+            <p className="text-xs text-slate-400 max-w-sm">
+              Agrega tus materias del semestre para llevar el control de notas, cortes y calcular tu promedio ponderado automáticamente.
+            </p>
+            <button
+              onClick={() => setShowAddSubjectModal(true)}
+              className="mt-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Añadir primera materia</span>
+            </button>
+          </div>
+        )}
         {subjects.map((subj) => {
           const corte1Avg = subj.cortes[0] ? calculateCorteAverage(subj.cortes[0]) : null;
           const corte2Avg = subj.cortes[1] ? calculateCorteAverage(subj.cortes[1]) : null;

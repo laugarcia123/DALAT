@@ -24,12 +24,8 @@ def listar_tareas_usuario(
 ):
     """
     Lista las tareas del estudiante organizadas para el tablero Kanban.
-    Si es un estudiante nuevo con 0 tareas, le inicializa tareas modelo.
     """
-    tareas = get_user_tasks(db, user_id=current_user.id_usuario)
-    if len(tareas) == 0:
-        tareas = seed_default_tasks_for_user(db, user_id=current_user.id_usuario)
-    return tareas
+    return get_user_tasks(db, user_id=current_user.id_usuario)
 
 
 @router.post("/", response_model=TareaResponse, status_code=status.HTTP_201_CREATED)

@@ -24,7 +24,7 @@ export interface ResumenGuiaItem {
 }
 
 export interface GenerarRecursoRequest {
-  tipo_recurso: "Examen" | "Flashcards" | "Resumen" | "Guia";
+  tipo_recurso: "Examen" | "Flashcards" | "Resumen" | "Guia" | "Pack_General" | "Pack_Matematicas";
   materia: string;
   tema: string;
   dificultad?: string;

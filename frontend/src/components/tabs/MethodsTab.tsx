@@ -156,6 +156,7 @@ interface MethodsTabProps {
   onGoToCheckout?: () => void;
   tokensBalance?: number;
   onDeductTokens?: (amount: number) => void;
+  onSessionCompleted?: () => void;
 }
 
 export default function MethodsTab({
@@ -164,6 +165,7 @@ export default function MethodsTab({
   onGoToCheckout,
   tokensBalance = 0,
   onDeductTokens,
+  onSessionCompleted,
 }: MethodsTabProps) {
   // Detección reactiva y robusta de modo claro (prop, clase .theme-light en DOM o localStorage)
   const [domIsLight, setDomIsLight] = useState<boolean>(() => {
@@ -366,6 +368,7 @@ export default function MethodsTab({
         isOpen={selectedMethod?.id === "pomodoro"}
         onClose={() => setSelectedMethod(null)}
         isLightMode={domIsLight}
+        onSessionCompleted={onSessionCompleted}
       />
 
       {/* Ventana interactiva y Puerta Falsa para Método Feynman con IA */}
@@ -391,6 +394,7 @@ export default function MethodsTab({
         onGoToCheckout={onGoToCheckout}
         tokensBalance={tokensBalance}
         onDeductTokens={onDeductTokens}
+        onSessionCompleted={onSessionCompleted}
       />
 
       {/* Ventana interactiva para Repetición Espaciada (Bloques progresivos 1h + 15m y Calendario de Tachado) */}
@@ -398,6 +402,7 @@ export default function MethodsTab({
         isOpen={selectedMethod?.id === "spaced_repetition"}
         onClose={() => setSelectedMethod(null)}
         isLightMode={domIsLight}
+        onSessionCompleted={onSessionCompleted}
       />
 
       {/* Ventana interactiva para Recuerdo Activo (Línea de meta Duolingo, 5m descanso, volcado mental y flashcards) */}
@@ -405,6 +410,7 @@ export default function MethodsTab({
         isOpen={selectedMethod?.id === "recuerdo_activo"}
         onClose={() => setSelectedMethod(null)}
         isLightMode={domIsLight}
+        onSessionCompleted={onSessionCompleted}
       />
 
       {/* Modal para las demás técnicas de estudio */}

@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 # Por defecto intenta conectar a PostgreSQL con el driver psycopg2
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+psycopg2://postgres:admin123@localhost:5432/dalat_db"
+    "postgresql+psycopg2://postgres:admin123@127.0.0.1:5432/dalat_db"
 )
 
 # Correccion de dialecto para psycopg2 en SQLAlchemy 2.0+

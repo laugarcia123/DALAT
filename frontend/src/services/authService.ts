@@ -9,6 +9,7 @@ export interface UserBackend {
   semestre?: string | null;
   biografia?: string | null;
   avatar_color?: string | null;
+  tokens_disponibles?: number;
   tipo_plan: "basico" | "pro" | "institucional" | "micro";
   es_institucional: boolean;
   is_active: boolean;
@@ -37,6 +38,7 @@ export interface LoginPayload {
   email: string;
   password: string;
   institucion?: string;
+  tipo_login?: "normal" | "institucion";
 }
 
 export interface UpdateUserPayload {
@@ -46,6 +48,8 @@ export interface UpdateUserPayload {
   semestre?: string;
   biografia?: string;
   avatar_color?: string;
+  tipo_plan?: string;
+  tokens_disponibles?: number;
   password?: string;
 }
 
@@ -57,6 +61,21 @@ export const authService = {
     const res = await apiFetch<AuthResponse>("/users/register", {
       method: "POST",
       body: JSON.stringify(data),
+      requiresAuth: false,
+    });
+    if (res.access_token) {
+      setStoredToken(res.access_token);
+    }
+    return res;
+  },
+
+  /**
+   * Inicio de sesión rápido social (Google, GitHub, Facebook)
+   */
+  async socialLogin(provider: string, email?: string): Promise<AuthResponse> {
+    const res = await apiFetch<AuthResponse>("/users/social-login", {
+      method: "POST",
+      body: JSON.stringify({ provider, email }),
       requiresAuth: false,
     });
     if (res.access_token) {
@@ -102,10 +121,41 @@ export const authService = {
   },
 
   /**
-   * Cerrar sesión
+   * Actualizar y persistir el plan del usuario (PRO, Micro, etc.)
+   */
+  async upgradePlan(plan: string, tokens?: number): Promise<UserBackend> {
+    return apiFetch<UserBackend>("/users/upgrade-plan", {
+      method: "POST",
+      body: JSON.stringify({ plan, tokens }),
+      requiresAuth: true,
+    });
+  },
+
+  /**
+   * Descontar tokens del saldo del usuario y sincronizar con PostgreSQL
+   */
+  async deductTokens(amount: number): Promise<UserBackend> {
+    return apiFetch<UserBackend>("/users/deduct-tokens", {
+      method: "POST",
+      body: JSON.stringify({ amount }),
+      requiresAuth: true,
+    });
+  },
+
+  /**
+   * Cerrar sesión y purgar todos los datos locales del usuario para evitar filtraciones entre cuentas
    */
   logout(): void {
     setStoredToken(null);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("dalat_user_plan");
+        localStorage.removeItem("dalat_user_tokens");
+        localStorage.removeItem("dalat_weekly_goal_hours");
+        localStorage.removeItem("dalat_ai_materials");
+        localStorage.removeItem("dalat_grade_scale");
+      } catch {}
+    }
   },
 
   /**

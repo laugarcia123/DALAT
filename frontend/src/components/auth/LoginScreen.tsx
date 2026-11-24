@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Mail,
@@ -16,7 +16,8 @@ import {
   Building2,
   ChevronDown,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  X
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { useAuth } from "@/context/AuthContext";
@@ -61,9 +62,9 @@ export default function LoginScreen({
   const [loginType, setLoginType] = useState<"normal" | "institucion">("normal");
 
   // Inputs
-  const [name, setName] = useState(defaultName || "Andrea Gómez");
-  const [email, setEmail] = useState(defaultEmail || "andrea@universidad.edu");
-  const [password, setPassword] = useState("Dalat2026*");
+  const [name, setName] = useState(defaultName || "Daniel Granados");
+  const [email, setEmail] = useState(defaultEmail || "danielgaber@gmail.com");
+  const [password, setPassword] = useState("123456hola");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -72,9 +73,15 @@ export default function LoginScreen({
   const [customInstitution, setCustomInstitution] = useState("");
   const [institutionalEmail, setInstitutionalEmail] = useState("estudiante@unal.edu.co");
 
-  const { login, register } = useAuth();
+  const { login, register, socialLogin } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [connectingSocial, setConnectingSocial] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Social Account Chooser Modal (Google, Facebook, GitHub)
+  const [socialModal, setSocialModal] = useState<"Google" | "Facebook" | "GitHub" | null>(null);
+  const [customSocialEmail, setCustomSocialEmail] = useState("");
+  const [useCustomSocialEmail, setUseCustomSocialEmail] = useState(false);
 
   // Password Recovery modal
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
@@ -108,12 +115,12 @@ export default function LoginScreen({
           email: targetEmail,
           password: password,
           institucion: finalUni,
+          tipo_login: loginType,
         });
         confetti({ particleCount: 40, spread: 65, origin: { y: 0.6 } });
         onLogin(loggedUser.name, loggedUser.email, loggedUser.career, loggedUser.university);
       }
     } catch (err: unknown) {
-      console.error("[LoginScreen] Error de autenticación:", err);
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(
         msg ||
@@ -124,9 +131,65 @@ export default function LoginScreen({
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    confetti({ particleCount: 35, spread: 65, origin: { y: 0.6 } });
-    onLogin(defaultName, `${defaultName.toLowerCase().replace(/\s+/g, ".")}@${provider.toLowerCase()}.com`);
+  // Escuchar respuesta de la ventana emergente oficial (popup OAuth)
+  useEffect(() => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (event.data?.type === "OAUTH_LOGIN_SUCCESS") {
+        const { provider, email, name } = event.data;
+        await handleExecuteSocialLogin(provider, email, name);
+      }
+    };
+
+    window.addEventListener("message", handleOAuthMessage);
+    return () => window.removeEventListener("message", handleOAuthMessage);
+  }, []);
+
+  const handleOpenSocialModal = (provider: "Google" | "Facebook" | "GitHub") => {
+    setErrorMsg(null);
+    setUseCustomSocialEmail(false);
+    setCustomSocialEmail("");
+
+    // Intentar abrir la ventana emergente centrada idéntica a Google en otros sitios web
+    if (typeof window !== "undefined") {
+      const width = 500;
+      const height = 620;
+      const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+      const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+      const popup = window.open(
+        `/auth/oauth-popup?provider=${provider.toLowerCase()}`,
+        `dalat_oauth_${provider.toLowerCase()}`,
+        `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=no,resizable=yes,scrollbars=yes`
+      );
+
+      // Si el navegador tiene bloqueador de popups, se despliega el modal idéntico en pantalla
+      if (!popup || popup.closed || typeof popup.closed === "undefined") {
+        setSocialModal(provider);
+      } else {
+        popup.focus();
+      }
+    } else {
+      setSocialModal(provider);
+    }
+  };
+
+  const handleExecuteSocialLogin = async (
+    provider: "Google" | "Facebook" | "GitHub",
+    email?: string,
+    nombre?: string
+  ) => {
+    try {
+      setConnectingSocial(provider);
+      setErrorMsg(null);
+      const loggedUser = await socialLogin(provider, email);
+      confetti({ particleCount: 45, spread: 70, origin: { y: 0.6 } });
+      setSocialModal(null);
+      onLogin(loggedUser.name, loggedUser.email, loggedUser.career, loggedUser.university);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(msg || `No se pudo iniciar sesión con ${provider}.`);
+    } finally {
+      setConnectingSocial(null);
+    }
   };
 
   const handleSendRecovery = (e: React.FormEvent) => {
@@ -365,67 +428,72 @@ export default function LoginScreen({
             </button>
           </form>
 
-          {/* Social Icons row (Circular buttons: Gmail / Google, Facebook, GitHub, LinkedIn) */}
+          {/* Social Icons row (Circular buttons: Google, Facebook, GitHub) */}
           <div className="space-y-2 pt-2 text-center">
             <span className="text-[11px] text-slate-400 block font-medium">o ingresa con tu cuenta</span>
             <div className="flex items-center justify-center gap-3">
-              {/* Google / Gmail */}
+              {/* Google */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("Google")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
-                title="Ingresar con Google / Gmail"
+                disabled={Boolean(connectingSocial)}
+                onClick={() => handleOpenSocialModal("Google")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer disabled:opacity-50"
+                title="Ingresar con Google"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#EA4335"
-                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.8C6.5 7.4 9 5 12 5z"
-                  />
-                  <path
-                    fill="#4285F4"
-                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.8c2.2-2 3.7-5 3.7-8.7z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.6 14.8c-.3-.8-.4-1.8-.4-2.8s.1-2 .4-2.8L1.9 6.4C.7 8.8 0 11.3 0 14s.7 5.2 1.9 7.6l3.7-2.8v-4z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.8 5.6 7 10.1 7z"
-                  />
-                </svg>
+                {connectingSocial === "Google" ? (
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                )}
               </button>
 
               {/* Facebook */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("Facebook")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                disabled={Boolean(connectingSocial)}
+                onClick={() => handleOpenSocialModal("Facebook")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white disabled:opacity-50"
                 title="Ingresar con Facebook"
               >
-                <span className="font-bold text-sm leading-none">f</span>
+                {connectingSocial === "Facebook" ? (
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                ) : (
+                  <span className="font-bold text-sm leading-none">f</span>
+                )}
               </button>
 
               {/* GitHub */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("GitHub")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                disabled={Boolean(connectingSocial)}
+                onClick={() => handleOpenSocialModal("GitHub")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white disabled:opacity-50"
                 title="Ingresar con GitHub"
               >
-                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                </svg>
-              </button>
-
-              {/* LinkedIn */}
-              <button
-                type="button"
-                onClick={() => handleSocialLogin("LinkedIn")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
-                title="Ingresar con LinkedIn"
-              >
-                <span className="font-bold text-xs leading-none">in</span>
+                {connectingSocial === "GitHub" ? (
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -549,67 +617,72 @@ export default function LoginScreen({
             </button>
           </form>
 
-          {/* Social Icons row (Circular buttons: Gmail / Google, Facebook, GitHub, LinkedIn) */}
+          {/* Social Icons row (Circular buttons: Google, Facebook, GitHub) */}
           <div className="space-y-2 pt-2 text-center">
             <span className="text-[11px] text-slate-400 block font-medium">o regístrate con tu cuenta</span>
             <div className="flex items-center justify-center gap-3">
-              {/* Google / Gmail */}
+              {/* Google */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("Google")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
-                title="Registrarse con Google / Gmail"
+                disabled={Boolean(connectingSocial)}
+                onClick={() => handleOpenSocialModal("Google")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer disabled:opacity-50"
+                title="Registrarse con Google"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#EA4335"
-                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.8C6.5 7.4 9 5 12 5z"
-                  />
-                  <path
-                    fill="#4285F4"
-                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.8c2.2-2 3.7-5 3.7-8.7z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.6 14.8c-.3-.8-.4-1.8-.4-2.8s.1-2 .4-2.8L1.9 6.4C.7 8.8 0 11.3 0 14s.7 5.2 1.9 7.6l3.7-2.8v-4z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.8 5.6 7 10.1 7z"
-                  />
-                </svg>
+                {connectingSocial === "Google" ? (
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                )}
               </button>
 
               {/* Facebook */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("Facebook")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                disabled={Boolean(connectingSocial)}
+                onClick={() => handleOpenSocialModal("Facebook")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white disabled:opacity-50"
                 title="Registrarse con Facebook"
               >
-                <span className="font-bold text-sm leading-none">f</span>
+                {connectingSocial === "Facebook" ? (
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                ) : (
+                  <span className="font-bold text-sm leading-none">f</span>
+                )}
               </button>
 
               {/* GitHub */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("GitHub")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
+                disabled={Boolean(connectingSocial)}
+                onClick={() => handleOpenSocialModal("GitHub")}
+                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white disabled:opacity-50"
                 title="Registrarse con GitHub"
               >
-                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                </svg>
-              </button>
-
-              {/* LinkedIn */}
-              <button
-                type="button"
-                onClick={() => handleSocialLogin("LinkedIn")}
-                className="w-10 h-10 rounded-full border border-white/15 hover:border-white/40 bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer text-slate-300 hover:text-white"
-                title="Registrarse con LinkedIn"
-              >
-                <span className="font-bold text-xs leading-none">in</span>
+                {connectingSocial === "GitHub" ? (
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -692,6 +765,240 @@ export default function LoginScreen({
         </div>
 
       </div>
+
+      {/* Social Account Chooser Modal (Google, Facebook, GitHub) */}
+      {socialModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          {socialModal === "Google" ? (
+            /* ========================================================================= */
+            /* DISEÑO OFICIAL 1:1 DE GOOGLE SIGN-IN (Material Design Blanco y Limpio)   */
+            /* ========================================================================= */
+            <div className="w-full max-w-[450px] bg-white rounded-2xl border border-[#dadce0] p-7 sm:p-9 shadow-2xl text-left text-[#202124] relative animate-in zoom-in-95 duration-150 font-sans">
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setSocialModal(null)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full hover:bg-[#f1f3f4] text-[#5f6368] flex items-center justify-center transition cursor-pointer"
+                title="Cerrar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Official Google 4-Color Logo */}
+              <div className="flex justify-center mb-3">
+                <svg className="w-9 h-9" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+              </div>
+
+              {/* Heading */}
+              <div className="text-center mb-5">
+                <h2 className="text-[22px] font-normal text-[#202124] mb-1 font-sans">
+                  Acceder con Google
+                </h2>
+                <p className="text-sm text-[#5f6368]">
+                  Elegir una cuenta para ir a{" "}
+                  <span className="font-semibold text-[#202124]">Dalat</span>
+                </p>
+              </div>
+
+              {/* Accounts list */}
+              <div className="border-t border-[#dadce0] divide-y divide-[#dadce0] -mx-4 sm:-mx-6">
+                {/* Account 1: Daniel Granados */}
+                <button
+                  type="button"
+                  disabled={Boolean(connectingSocial)}
+                  onClick={() =>
+                    handleExecuteSocialLogin(
+                      "Google",
+                      "danielgaber@gmail.com",
+                      "Daniel Granados"
+                    )
+                  }
+                  className="w-full px-6 py-3.5 flex items-center gap-3.5 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] transition text-left cursor-pointer group disabled:opacity-60"
+                >
+                  <div className="w-9 h-9 rounded-full bg-[#1a73e8] text-white flex items-center justify-center font-medium text-sm shrink-0 shadow-xs">
+                    D
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-[#202124] group-hover:text-[#1a73e8] transition truncate">
+                      Daniel Granados
+                    </div>
+                    <div className="text-xs text-[#5f6368] truncate">
+                      danielgaber@gmail.com
+                    </div>
+                  </div>
+                  {connectingSocial === "Google" && (
+                    <Loader2 className="w-4 h-4 text-[#1a73e8] animate-spin" />
+                  )}
+                </button>
+
+                {/* Account 2: Usar otra cuenta */}
+                {!useCustomSocialEmail ? (
+                  <button
+                    type="button"
+                    onClick={() => setUseCustomSocialEmail(true)}
+                    className="w-full px-6 py-3.5 flex items-center gap-3.5 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] transition text-left cursor-pointer text-[#202124] text-sm font-medium"
+                  >
+                    <div className="w-9 h-9 rounded-full border border-[#dadce0] flex items-center justify-center text-[#5f6368] shrink-0">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <span>Usar otra cuenta</span>
+                  </button>
+                ) : (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (customSocialEmail.trim()) {
+                        handleExecuteSocialLogin(
+                          "Google",
+                          customSocialEmail.trim()
+                        );
+                      }
+                    }}
+                    className="p-4 bg-[#f8f9fa] space-y-3"
+                  >
+                    <label className="text-xs text-[#5f6368] font-medium block">
+                      Correo electrónico o teléfono
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      autoFocus
+                      value={customSocialEmail}
+                      onChange={(e) => setCustomSocialEmail(e.target.value)}
+                      placeholder="ejemplo@gmail.com"
+                      className="w-full px-3.5 py-2.5 rounded-md border border-[#dadce0] bg-white text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
+                    />
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setUseCustomSocialEmail(false)}
+                        className="px-3 py-1.5 text-xs text-[#1a73e8] hover:bg-[#f1f3f4] rounded font-medium cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={Boolean(connectingSocial)}
+                        className="px-4 py-1.5 text-xs bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded font-medium shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        {connectingSocial ? "Conectando..." : "Siguiente"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* Disclaimer */}
+              <div className="mt-7 text-[12px] text-[#5f6368] leading-relaxed border-t border-[#dadce0] pt-4">
+                Para continuar, Google compartirá tu nombre, dirección de correo electrónico, preferencia de idioma y foto de perfil con{" "}
+                <strong className="text-[#202124]">Dalat</strong>. Antes de usar esta app, puedes consultar la{" "}
+                <span className="text-[#1a73e8] hover:underline cursor-pointer">
+                  Política de Privacidad
+                </span>{" "}
+                y las{" "}
+                <span className="text-[#1a73e8] hover:underline cursor-pointer">
+                  Condiciones del Servicio
+                </span>{" "}
+                de Dalat.
+              </div>
+
+              {/* Footer */}
+              <div className="mt-4 flex items-center justify-between text-[11px] text-[#5f6368] pt-2">
+                <span>Español (Latinoamérica)</span>
+                <div className="flex items-center gap-3">
+                  <span className="hover:underline cursor-pointer">Ayuda</span>
+                  <span className="hover:underline cursor-pointer">Privacidad</span>
+                  <span className="hover:underline cursor-pointer">Condiciones</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Modal para Facebook / GitHub */
+            <div className="w-full max-w-md p-6 sm:p-7 rounded-3xl bg-[#0c0f22] border border-[#232948] shadow-2xl text-left relative overflow-hidden">
+              <div className="flex items-start justify-between pb-3 border-b border-white/[0.08]">
+                <div className="flex items-center gap-3">
+                  {socialModal === "Facebook" && (
+                    <div className="w-10 h-10 rounded-2xl bg-[#1877F2]/20 text-[#1877F2] flex items-center justify-center font-bold text-lg border border-[#1877F2]/30">
+                      f
+                    </div>
+                  )}
+                  {socialModal === "GitHub" && (
+                    <div className="w-10 h-10 rounded-2xl bg-white/10 text-white flex items-center justify-center border border-white/20">
+                      <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                      </svg>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="font-bold text-white text-base">
+                      Continuar con {socialModal}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Selecciona una cuenta para ir a <span className="text-white font-semibold">Dalat</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSocialModal(null)}
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <button
+                  type="button"
+                  disabled={Boolean(connectingSocial)}
+                  onClick={() =>
+                    handleExecuteSocialLogin(
+                      socialModal,
+                      "danielgaber@gmail.com",
+                      "Daniel Granados"
+                    )
+                  }
+                  className="w-full p-3.5 rounded-2xl bg-white/[0.04] hover:bg-purple-600/15 border border-white/[0.08] hover:border-purple-500/50 flex items-center justify-between transition-all duration-200 group cursor-pointer text-left disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#7c5dfa] to-cyan-400 text-white font-bold flex items-center justify-center text-sm shadow-md">
+                      DG
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white text-sm">
+                        Daniel Granados
+                      </div>
+                      <div className="text-xs text-slate-400 font-mono">
+                        danielgaber@gmail.com
+                      </div>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-300 transition-all" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Forgot Password Modal */}
       {forgotModalOpen && (

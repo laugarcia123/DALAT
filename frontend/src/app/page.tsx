@@ -29,7 +29,9 @@ import {
   Sun,
   Moon,
   BookOpen,
-  Check
+  Check,
+  Pencil,
+  Target
 } from "lucide-react";
 
 import ScheduleTab from "@/components/tabs/ScheduleTab";
@@ -37,8 +39,8 @@ import MethodsTab from "@/components/tabs/MethodsTab";
 import NotesTab from "@/components/tabs/NotesTab";
 import AiResourcesTab from "@/components/tabs/AiResourcesTab";
 import RepositoryTab from "@/components/tabs/RepositoryTab";
-import DailyMicroReview from "@/components/dashboard/DailyMicroReview";
 import AmbientAudioPlayer from "@/components/dashboard/AmbientAudioPlayer";
+import WeeklyGoalModal from "@/components/dashboard/WeeklyGoalModal";
 import ProfileModal, { UserProfile } from "@/components/profile/ProfileModal";
 import LoginScreen from "@/components/auth/LoginScreen";
 import LandingPage from "@/components/landing/LandingPage";
@@ -122,90 +124,65 @@ function formatTaskDateLabel(dateStr?: string | null): string {
 
 const ZEN_SUBJECTS = [
   { id: "General", label: "General", desc: "Estudio libre o variado", color: "bg-indigo-500" },
-  { id: "Cálculo III", label: "Cálculo III", desc: "Matemáticas avanzadas", color: "bg-purple-500" },
-  { id: "Economía", label: "Economía", desc: "Micro y Macroeconomía", color: "bg-emerald-500" },
-  { id: "Química", label: "Química", desc: "Química y laboratorios", color: "bg-rose-500" },
-  { id: "Sistemas", label: "Sistemas", desc: "Software y algoritmos", color: "bg-amber-500" },
-  { id: "Arquitectura", label: "Arquitectura", desc: "Diseño y estructuras", color: "bg-sky-500" },
+  { id: "Lectura", label: "Lectura", desc: "Artículos y capítulos", color: "bg-emerald-500" },
+  { id: "Práctica", label: "Práctica", desc: "Ejercicios y problemas", color: "bg-purple-500" },
+  { id: "Proyecto", label: "Proyecto", desc: "Trabajos e informes", color: "bg-amber-500" },
+  { id: "Repaso", label: "Repaso", desc: "Preparación para exámenes", color: "bg-rose-500" },
 ];
 
-const INITIAL_TASKS: TaskItem[] = [
-  // Urgente
-  {
-    id: "1",
-    title: "Ensayo de Cálculo — integrales dobles",
-    subject: "Cálculo III",
-    column: "urgente",
-    completed: false,
-    dueDate: getOffsetDate(1),
-  },
-  {
-    id: "2",
-    title: "Entregar práctica de Química",
-    subject: "Química",
-    column: "urgente",
-    completed: false,
-    dueDate: getOffsetDate(2),
-  },
-  {
-    id: "3",
-    title: "Presentación de Arquitectura",
-    subject: "Sistemas",
-    column: "urgente",
-    completed: false,
-    dueDate: getOffsetDate(3),
-  },
-  // En Progreso
-  {
-    id: "4",
-    title: "Leer capítulos 7-9 de Economía",
-    subject: "Economía",
-    column: "en_progreso",
-    completed: false,
-    dueDate: getOffsetDate(4),
-  },
-  {
-    id: "5",
-    title: "Completar ejercicios del parcial",
-    subject: "Cálculo III",
-    column: "en_progreso",
-    completed: false,
-    dueDate: getOffsetDate(5),
-  },
-  {
-    id: "6",
-    title: "Revisar apuntes de Historia",
-    subject: "Historia",
-    column: "en_progreso",
-    completed: false,
-    dueDate: getOffsetDate(7),
-  },
-  // Para después
-  {
-    id: "7",
-    title: "Cuestionario de Historia Universal",
-    subject: "Historia",
-    column: "para_despues",
-    completed: false,
-    dueDate: getOffsetDate(9),
-  },
-  {
-    id: "8",
-    title: "Investigar proyecto final",
-    subject: "Arquitectura",
-    column: "para_despues",
-    completed: false,
-    dueDate: getOffsetDate(11),
-  },
-  {
-    id: "9",
-    title: "Leer artículo extra de Economía",
-    subject: "Economía",
-    column: "para_despues",
-    completed: false,
-    dueDate: getOffsetDate(13),
-  },
-];
+const INITIAL_TASKS: TaskItem[] = [];
+
+function StreakTooltipBubble() {
+  return (
+    <div className="w-72 p-3.5 rounded-2xl border shadow-2xl backdrop-blur-md bg-white/95 dark:bg-[#0c0f1d]/95 border-slate-200/90 dark:border-white/10 text-left select-none ring-1 ring-black/5 dark:ring-white/5">
+      <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-white/[0.08]">
+        <div className="w-6 h-6 rounded-lg bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center shrink-0">
+          <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-xs font-bold text-slate-800 dark:text-white tracking-tight truncate">
+            ¿Cómo aumentar tu racha?
+          </h4>
+          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+            1 día de racha por jornada
+          </span>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-2 pb-1.5 leading-snug">
+        Completa al menos una sesión de estudio al día con:
+      </p>
+
+      <ul className="space-y-1.5 text-[11px] text-slate-700 dark:text-slate-200">
+        <li className="flex items-start gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0 mt-1.5" />
+          <span><strong>Método Pomodoro:</strong> bloque de 25 min</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0 mt-1.5" />
+          <span><strong>Repetición Espaciada:</strong> cumplir el día</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0 mt-1.5" />
+          <span><strong>Recuerdo Activo:</strong> 5 pasos completos</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 mt-1.5" />
+          <span><strong>Método Psicópata:</strong> responder todo</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+          <span><strong>Modo Zen:</strong> sesión de concentración</span>
+        </li>
+      </ul>
+
+      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-white/[0.08] flex items-center justify-between text-[10px] text-slate-400">
+        <span>Se renueva cada día a las:</span>
+        <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">12:00 AM</span>
+      </div>
+    </div>
+  );
+}
 
 export default function StudyDashboard() {
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -222,7 +199,7 @@ export default function StudyDashboard() {
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
 
   // User Profile & Authentication State (Real Backend Sync)
-  const { user: authUser, updateProfile: authUpdateProfile, logout: authLogout, isAuthenticated } = useAuth();
+  const { user: authUser, updateProfile: authUpdateProfile, upgradePlan: authUpgradePlan, deductTokens: authDeductTokens, logout: authLogout, isAuthenticated } = useAuth();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<"login" | "register">("login");
@@ -284,17 +261,17 @@ export default function StudyDashboard() {
       } catch {}
     }
     return {
-      name: "Andrea",
-      email: "andrea.gomez@universidad.edu",
-      career: "Ingeniería de Sistemas",
-      university: "Universidad Central",
-      semester: "6to Semestre",
-      bio: "Estudiante enfocada en cálculo multivariable, algoritmos y diseño de sistemas.",
+      name: "Estudiante",
+      email: "",
+      career: "",
+      university: "",
+      semester: "",
+      bio: "",
       avatarColor: "#5828c6",
       plan: initialPlan,
-      targetGpa: "4.7 / 5.0",
-      studyStreakDays: 14,
-      totalStudyHours: 52.4,
+      targetGpa: "4.5 / 5.0",
+      studyStreakDays: 0,
+      totalStudyHours: 0,
     };
   });
 
@@ -305,10 +282,10 @@ export default function StudyDashboard() {
         if (saved !== null) return parseInt(saved, 10);
       } catch {}
     }
-    return 150;
+    return 10;
   });
 
-  const handleDeductTokens = (amount: number) => {
+  const handleDeductTokens = async (amount: number) => {
     setTokensBalance((prev) => {
       const next = Math.max(0, prev - amount);
       try {
@@ -316,6 +293,17 @@ export default function StudyDashboard() {
       } catch {}
       return next;
     });
+
+    try {
+      if (isAuthenticated) {
+        const newBalance = await authDeductTokens(amount);
+        if (newBalance !== undefined && newBalance !== null && newBalance > 0) {
+          setTokensBalance(newBalance);
+        }
+      }
+    } catch (err) {
+      console.warn("[page] Error persistiendo deducción de tokens:", err);
+    }
   };
 
   const handleGoToCheckout = (plan?: SelectedPlan) => {
@@ -332,10 +320,44 @@ export default function StudyDashboard() {
     if (authUser) {
       queueMicrotask(() => {
         setProfile(authUser);
+        if (authUser.tokensBalance !== undefined) {
+          setTokensBalance(authUser.tokensBalance);
+        } else if (authUser.isInstitutional || authUser.plan === "institucional") {
+          setTokensBalance(500);
+        } else if (authUser.plan === "pro") {
+          setTokensBalance(150);
+        } else if (authUser.plan === "micro") {
+          setTokensBalance(40);
+        } else {
+          setTokensBalance(10);
+        }
         setIsLoggedIn(true);
       });
+    } else {
+      setIsLoggedIn(false);
+      setActiveTab("Dashboard");
     }
   }, [authUser]);
+
+  // Si el usuario ingresa con un enlace de invitación a un repositorio, abrir pestaña Repositorio
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("join_repo") || localStorage.getItem("dalat_pending_invite")) {
+        setActiveTab("Repositorio");
+      }
+    }
+  }, []);
+
+  // Acceso PRO o Institucional: desbloquea el 100% de los servicios avanzados
+  const isUserProOrInstitutional = Boolean(
+    profile.isInstitutional ||
+    profile.plan === "institucional" ||
+    profile.plan === "pro" ||
+    authUser?.isInstitutional ||
+    authUser?.plan === "institucional" ||
+    authUser?.plan === "pro"
+  );
   
   // New task input state
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -347,23 +369,19 @@ export default function StudyDashboard() {
   const [showDateMenu, setShowDateMenu] = useState(false);
 
   const AVAILABLE_SUBJECTS = [
-    "Cálculo III",
-    "Economía",
-    "Química",
-    "Sistemas",
-    "Historia",
-    "Arquitectura",
     "General",
+    "Matemáticas",
+    "Lectura",
+    "Proyecto",
+    "Repaso",
   ];
 
   const SUBJECT_COLORS: Record<string, string> = {
-    "Cálculo III": "bg-violet-500",
-    "Economía": "bg-emerald-500",
-    "Química": "bg-amber-500",
-    "Sistemas": "bg-sky-500",
-    "Historia": "bg-orange-500",
-    "Arquitectura": "bg-rose-500",
     "General": "bg-indigo-500",
+    "Matemáticas": "bg-violet-500",
+    "Lectura": "bg-emerald-500",
+    "Proyecto": "bg-amber-500",
+    "Repaso": "bg-rose-500",
   };
 
   // Mobile board column filter tab
@@ -444,13 +462,37 @@ export default function StudyDashboard() {
   const [studyStats, setStudyStats] = useState<StudySessionStats | null>(null);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
-  // Cargar estadísticas de estudio (racha, horas de la semana, meta)
-  const loadStudyStats = React.useCallback(async () => {
-    if (!isAuthenticated) return;
+  // Meta semanal de estudio configurable por el estudiante (por defecto 40h o personalizada)
+  const [weeklyGoalHours, setWeeklyGoalHours] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("dalat_weekly_goal_hours");
+        if (saved) {
+          const val = parseFloat(saved);
+          if (!isNaN(val) && val >= 1 && val <= 100) return val;
+        }
+      } catch {}
+    }
+    return 40;
+  });
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState<boolean>(false);
+
+  // Cargar estadísticas de estudio (racha, horas de la semana, meta personalizada)
+  const loadStudyStats = React.useCallback(async (goalOverride?: number) => {
+    if (!authUser) {
+      setStudyStats(null);
+      return;
+    }
     try {
-      const stats = await studySessionService.getStats();
+      const stats = await studySessionService.getStats(goalOverride);
       if (stats) {
         setStudyStats(stats);
+        if (typeof stats.meta_semanal_horas === "number") {
+          setWeeklyGoalHours(stats.meta_semanal_horas);
+          try {
+            localStorage.setItem("dalat_weekly_goal_hours", stats.meta_semanal_horas.toString());
+          } catch {}
+        }
         setProfile((prev) => ({
           ...prev,
           studyStreakDays: stats.racha_dias_actual,
@@ -460,13 +502,15 @@ export default function StudyDashboard() {
     } catch (err) {
       console.warn("No se pudieron cargar las estadísticas de estudio:", err);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   React.useEffect(() => {
     void (async () => {
       await loadStudyStats();
     })();
-  }, [loadStudyStats]);
+  }, [loadStudyStats, authUser?.email, authUser?.id]);
+
+
 
   // Completar o registrar sesión de estudio en backend
   const handleCompleteZenSession = async (completed: boolean = true) => {
@@ -483,18 +527,16 @@ export default function StudyDashboard() {
         colors: ["#7c5dfa", "#a78bfa", "#34d399", "#f59e0b"],
       });
 
-      if (isAuthenticated) {
-        try {
-          await studySessionService.logSession({
-            duracion_segundos: durationToSave,
-            materia: zenSubject || "General",
-            completada: completed,
-            tipo: "zen",
-          });
-          await loadStudyStats();
-        } catch (err) {
-          console.error("Error al registrar sesión en backend:", err);
-        }
+      try {
+        await studySessionService.logSession({
+          duracion_segundos: durationToSave,
+          materia: zenSubject || "General",
+          completada: completed,
+          tipo: "zen",
+        });
+        await loadStudyStats();
+      } catch (err) {
+        console.error("Error al registrar sesión en backend:", err);
       }
       setZenSavedToast(true);
       setTimeout(() => setZenSavedToast(false), 3500);
@@ -506,11 +548,14 @@ export default function StudyDashboard() {
 
   // Cargar tareas reales desde el backend cuando el usuario inicia sesión
   const loadTasks = React.useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !authUser) {
+      setTasks([]);
+      return;
+    }
     try {
       setLoadingTasks(true);
       const backendTasks = await taskService.getTasks();
-      if (backendTasks && backendTasks.length > 0) {
+      if (backendTasks && Array.isArray(backendTasks) && backendTasks.length > 0) {
         setTasks(
           backendTasks.map((t) => ({
             id: String(t.id_tarea),
@@ -522,19 +567,23 @@ export default function StudyDashboard() {
             dueDate: t.fecha_limite || undefined,
           }))
         );
+      } else {
+        setTasks([]);
       }
     } catch (err) {
-      console.warn("No se pudieron cargar las tareas desde el backend, usando locales:", err);
+      console.warn("No se pudieron cargar las tareas desde el backend:", err);
+      setTasks([]);
     } finally {
       setLoadingTasks(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authUser?.id, authUser?.email]);
 
   React.useEffect(() => {
     void (async () => {
+      setTasks([]);
       await loadTasks();
     })();
-  }, [loadTasks]);
+  }, [loadTasks, authUser?.id, authUser?.email]);
 
   // Zen timer effect
   React.useEffect(() => {
@@ -683,6 +732,7 @@ export default function StudyDashboard() {
         <LoginScreen
           initialMode={authInitialMode}
           onLogin={(userName, userEmail, userCareer, userUni) => {
+            setActiveTab("Dashboard");
             setIsLoggedIn(true);
             setShowLoginModal(false);
             setProfile((prev) => ({
@@ -703,13 +753,14 @@ export default function StudyDashboard() {
     return (
       <LandingPage
         onLoginClick={(mode?: "login" | "register") => {
+          setActiveTab("Dashboard");
           setAuthInitialMode(mode || "login");
           setShowLoginModal(true);
         }}
-        onEnterApp={(userName, userEmail) => {
-          if (userName) setProfile((prev) => ({ ...prev, name: userName }));
-          if (userEmail) setProfile((prev) => ({ ...prev, email: userEmail }));
-          setIsLoggedIn(true);
+        onEnterApp={() => {
+          setActiveTab("Dashboard");
+          setAuthInitialMode("login");
+          setShowLoginModal(true);
         }}
       />
     );
@@ -797,13 +848,18 @@ export default function StudyDashboard() {
         onBackToPricing={() => {
           setShowPricing(true);
         }}
-        onPaymentSuccess={() => {
-          setProfile((prev) => ({ ...prev, plan: "pro" }));
+        onPaymentSuccess={async () => {
           const creditsToAdd = checkoutPlan.name.includes("Sprint")
             ? 40
             : checkoutPlan.name.includes("Corte")
             ? 80
             : 150;
+          try {
+            await authUpgradePlan("pro", creditsToAdd);
+          } catch (e) {
+            console.error("Error persistiendo plan en PostgreSQL:", e);
+          }
+          setProfile((prev) => ({ ...prev, plan: "pro", tokensBalance: creditsToAdd }));
           setTokensBalance(creditsToAdd);
           try {
             localStorage.setItem("dalat_user_plan", "pro");
@@ -811,6 +867,7 @@ export default function StudyDashboard() {
           } catch {}
           setCheckoutPlan(null);
           setShowPricing(false);
+          setActiveTab("Dashboard");
           confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
         }}
       />
@@ -1132,14 +1189,22 @@ export default function StudyDashboard() {
             {/* Etiqueta a un lado de Dalat */}
             <span
               className={`ml-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-bold tracking-tight font-badge select-none border transition-all shadow-2xs ${
-                profile.plan === "pro"
+                profile.isInstitutional || profile.plan === "institucional"
+                  ? "bg-purple-500/20 border-purple-400/40 text-purple-300"
+                  : profile.plan === "pro"
                   ? "bg-amber-400/15 border-amber-400/40 text-amber-500 dark:text-amber-400"
                   : isLightMode
                   ? "bg-purple-100/90 text-purple-700 border-purple-200"
                   : "bg-[#18152c] text-purple-300 border-purple-500/30"
               }`}
             >
-              {profile.plan === "pro" ? "Plan PRO" : "Plan Básico"}
+              {profile.isInstitutional || profile.plan === "institucional"
+                ? "Plan Institucional"
+                : profile.plan === "pro"
+                ? "Plan PRO"
+                : profile.plan === "micro"
+                ? "Microsuscripción"
+                : "Plan Básico"}
             </span>
           </div>
 
@@ -1174,15 +1239,22 @@ export default function StudyDashboard() {
               {headerDate || getHeaderDateFormatted()}
             </span>
 
-            {/* Indicador de Racha de Estudio (solo fuego y número, sin contorno) */}
-            <div
-              className="inline-flex items-center gap-1.5 select-none transition-transform hover:scale-105"
-              title="Racha de estudio"
-            >
-              <Flame className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0 drop-shadow-xs" />
-              <span className="font-extrabold text-xs sm:text-sm font-mono text-amber-600 dark:text-amber-400">
-                {profile.studyStreakDays || 14}
-              </span>
+            {/* Indicador de Racha de Estudio con burbuja informativa no intrusiva */}
+            <div className="relative group">
+              <div
+                className="inline-flex items-center gap-1.5 select-none transition-transform hover:scale-105 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-amber-500/10"
+                aria-label="Racha de estudio diaria"
+              >
+                <Flame className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0 drop-shadow-xs" />
+                <span className="font-extrabold text-xs sm:text-sm font-mono text-amber-600 dark:text-amber-400">
+                  {studyStats ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)}
+                </span>
+              </div>
+
+              {/* Burbuja flotante no intrusiva */}
+              <div className="absolute top-full right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 mt-2 z-50 pointer-events-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ease-out translate-y-1 group-hover:translate-y-0">
+                <StreakTooltipBubble />
+              </div>
             </div>
 
             {/* Theme Toggle Button (Dark / Light Mode) */}
@@ -1269,8 +1341,8 @@ export default function StudyDashboard() {
                     </div>
 
                     <div className="py-1 space-y-1">
-                      {/* Option: Mejorar a PRO (solo para usuarios del plan básico) */}
-                      {profile.plan !== "pro" && (
+                      {/* Option: Mejorar a PRO (solo para usuarios del plan básico/micro no institucionales) */}
+                      {!isUserProOrInstitutional && (
                         <button
                           onClick={() => {
                             setProfileDropdownOpen(false);
@@ -1307,6 +1379,7 @@ export default function StudyDashboard() {
                         onClick={() => {
                           setProfileDropdownOpen(false);
                           setShowLoginModal(false);
+                          setActiveTab("Dashboard");
                           authLogout();
                           setIsLoggedIn(false);
                         }}
@@ -1410,19 +1483,38 @@ export default function StudyDashboard() {
                   ¡Hola, {profile.name}!
                 </h1>
                 <p className="text-xs sm:text-sm text-purple-200/90 font-normal leading-relaxed">
-                  Tu tutor de IA de Dalat está listo para ayudarte con tus{" "}
-                  <span className="text-white font-semibold">
-                    {pendingCount} tareas pendientes
-                  </span>{" "}
-                  y maximizar tu concentración.
+                  {pendingCount > 0 ? (
+                    <>
+                      Tu tutor de IA de Dalat está listo para ayudarte con tus{" "}
+                      <span className="text-white font-semibold">
+                        {pendingCount} {pendingCount === 1 ? "tarea pendiente" : "tareas pendientes"}
+                      </span>{" "}
+                      y maximizar tu concentración.
+                    </>
+                  ) : (
+                    <>
+                      Tu tutor de IA de Dalat está listo. No tienes tareas pendientes, ¡añade tu primera tarea abajo para comenzar!
+                    </>
+                  )}
                 </p>
-                {/* Student Streak Badge: Clean, subtle & elegant */}
+                {/* Student Streak Badge con burbuja informativa no intrusiva */}
                 <div className="pt-1 flex justify-center md:justify-start">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.06] border border-white/[0.10] text-xs text-purple-200">
-                    <Flame className="w-3.5 h-3.5 text-amber-400" />
-                    <span>
-                      <strong className="text-white font-semibold">{profile.studyStreakDays || 14} días</strong> de racha
-                    </span>
+                  <div className="relative group">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.06] border border-white/[0.10] text-xs text-purple-200 cursor-pointer hover:bg-white/[0.12] transition-colors">
+                      <Flame className="w-3.5 h-3.5 text-amber-400" />
+                      <span>
+                        <strong className="text-white font-semibold">
+                          {studyStats ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)}{" "}
+                          {(studyStats ? studyStats.racha_dias_actual : (profile.studyStreakDays ?? 0)) === 1 ? "día" : "días"}
+                        </strong>{" "}
+                        de racha
+                      </span>
+                    </div>
+
+                    {/* Burbuja flotante no intrusiva */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 mt-2 z-50 pointer-events-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ease-out translate-y-1 group-hover:translate-y-0">
+                      <StreakTooltipBubble />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2295,9 +2387,15 @@ export default function StudyDashboard() {
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
                       META SEMANAL DE ESTUDIO
                     </span>
-                    <span className="text-xs font-semibold text-purple-300">
-                      {studyStats ? `${studyStats.porcentaje_meta_semanal}%` : "78%"}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsGoalModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold text-purple-600 dark:text-purple-300 hover:text-purple-700 dark:hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all cursor-pointer shadow-xs active:scale-95"
+                      title="Configurar tus horas objetivo de estudio semanal"
+                    >
+                      <Pencil className="w-3 h-3" />
+                      <span>Elegir meta</span>
+                    </button>
                   </div>
 
                   {/* Semicircle SVG Gauge */}
@@ -2333,7 +2431,7 @@ export default function StudyDashboard() {
                             (1 -
                               (studyStats
                                 ? Math.min(1, studyStats.porcentaje_meta_semanal / 100)
-                                : 0.775))
+                                : 0))
                           }
                           className="transition-all duration-1000 ease-out"
                         />
@@ -2342,29 +2440,35 @@ export default function StudyDashboard() {
                       {/* Centered Stats inside the arch */}
                       <div className="absolute inset-x-0 bottom-1 flex flex-col items-center justify-center">
                         <span className="text-3xl font-extrabold text-white tracking-tight">
-                          {studyStats ? `${studyStats.horas_esta_semana}h` : "31h"}
+                          {studyStats ? `${studyStats.horas_esta_semana}h` : "0h"}
                         </span>
-                        <span className="text-[11px] text-slate-400">
-                          de {studyStats ? `${studyStats.meta_semanal_horas}h` : "40h"} meta
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsGoalModalOpen(true)}
+                          className="group/meta inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-purple-300 transition-colors cursor-pointer"
+                          title="Cambiar meta de estudio semanal"
+                        >
+                          <span>de {studyStats ? `${studyStats.meta_semanal_horas}h` : `${weeklyGoalHours}h`} meta</span>
+                          <Pencil className="w-2.5 h-2.5 opacity-60 group-hover/meta:opacity-100 transition-opacity" />
+                        </button>
                       </div>
                     </div>
 
                     {/* Gauge Min and Max Labels */}
                     <div className="w-56 flex justify-between text-xs text-slate-500 font-medium px-2 mt-1">
                       <span>0h</span>
-                      <span>{studyStats ? `${studyStats.meta_semanal_horas}h` : "40h"}</span>
+                      <span>{studyStats ? `${studyStats.meta_semanal_horas}h` : `${weeklyGoalHours}h`}</span>
                     </div>
                   </div>
 
                   {/* Progress Summary Footer */}
                   <div className="text-center text-xs pt-1">
                     <span className="font-semibold text-[#818cf8]">
-                      {studyStats ? `${studyStats.porcentaje_meta_semanal}% completado` : "78% completado"}
+                      {studyStats ? `${studyStats.porcentaje_meta_semanal}% completado` : "0% completado"}
                     </span>
                     <span className="text-slate-400">
                       {" "}
-                      &bull; faltan {studyStats ? `${studyStats.horas_faltantes_meta}h` : "9h"}
+                      &bull; {studyStats ? `faltan ${studyStats.horas_faltantes_meta}h` : `faltan ${weeklyGoalHours}h esta semana`}
                     </span>
                   </div>
                 </div>
@@ -2394,9 +2498,6 @@ export default function StudyDashboard() {
                     <span className="text-white">Activar modo zen</span>
                   </button>
                 </div>
-
-                {/* Widget 3: Micro-repaso del Día (debajo de Modo Zen) */}
-                <DailyMicroReview isLightMode={isLightMode} />
               </aside>
             </div>
           </div>
@@ -2414,10 +2515,11 @@ export default function StudyDashboard() {
           <div className="animate-in fade-in duration-150">
             <MethodsTab
               isLightMode={isLightMode}
-              isPro={profile.plan === "pro"}
+              isPro={isUserProOrInstitutional}
               onGoToCheckout={() => handleGoToCheckout()}
-              tokensBalance={profile.plan === "pro" ? tokensBalance : 0}
+              tokensBalance={isUserProOrInstitutional ? tokensBalance : 0}
               onDeductTokens={handleDeductTokens}
+              onSessionCompleted={loadStudyStats}
             />
           </div>
         )}
@@ -2434,10 +2536,11 @@ export default function StudyDashboard() {
           <div className="animate-in fade-in duration-150">
             <AiResourcesTab
               isLightMode={isLightMode}
-              isPro={profile.plan === "pro"}
+              isPro={isUserProOrInstitutional}
               onGoToCheckout={() => handleGoToCheckout()}
-              tokensBalance={profile.plan === "pro" ? tokensBalance : 0}
+              tokensBalance={isUserProOrInstitutional ? tokensBalance : 0}
               onDeductTokens={handleDeductTokens}
+              onNavigateToRepository={() => setActiveTab("Repositorio")}
             />
           </div>
         )}
@@ -2445,7 +2548,11 @@ export default function StudyDashboard() {
         {/* Render Tab 6: Repositorio */}
         {activeTab === "Repositorio" && (
           <div className="animate-in fade-in duration-150">
-            <RepositoryTab isLightMode={isLightMode} />
+            <RepositoryTab
+              isLightMode={isLightMode}
+              isPro={isUserProOrInstitutional}
+              onGoToCheckout={() => handleGoToCheckout()}
+            />
           </div>
         )}
       </main>
@@ -2473,6 +2580,28 @@ export default function StudyDashboard() {
           } catch (err) {
             console.warn("[Profile] Error al sincronizar con backend:", err);
           }
+        }}
+      />
+
+      {/* Selector de Meta Semanal de Estudio */}
+      <WeeklyGoalModal
+        isOpen={isGoalModalOpen}
+        onClose={() => setIsGoalModalOpen(false)}
+        currentGoal={weeklyGoalHours}
+        isLightMode={isLightMode}
+        onSave={(newGoal) => {
+          setWeeklyGoalHours(newGoal);
+          try {
+            localStorage.setItem("dalat_weekly_goal_hours", newGoal.toString());
+          } catch {}
+          // Persistir en PostgreSQL y actualizar métricas
+          studySessionService
+            .updateWeeklyGoal(newGoal)
+            .then(() => loadStudyStats(newGoal))
+            .catch((err) => {
+              console.warn("Error al guardar meta semanal en la BD:", err);
+              void loadStudyStats(newGoal);
+            });
         }}
       />
     </div>

@@ -27,6 +27,14 @@ class UserLogin(BaseModel):
     email: str
     password: str
     institucion: Optional[str] = None
+    tipo_login: Optional[str] = "normal"
+
+
+# Esquema para Inicio de Sesión Social (Google, GitHub, Facebook)
+class SocialLoginRequest(BaseModel):
+    provider: str
+    email: Optional[str] = None
+    nombre: Optional[str] = None
 
 
 # Esquema para Actualización de Perfil
@@ -38,6 +46,8 @@ class UserUpdate(BaseModel):
     biografia: Optional[str] = None
     avatar_color: Optional[str] = None
     tipo_plan: Optional[TipoPlan] = None
+    tokens_disponibles: Optional[int] = None
+    meta_semanal_horas: Optional[int] = None
     password: Optional[str] = None
 
 
@@ -53,6 +63,8 @@ class UserResponse(BaseModel):
     avatar_color: Optional[str] = "#7c5dfa"
     tipo_plan: TipoPlan
     es_institucional: bool
+    tokens_disponibles: Optional[int] = 10
+    meta_semanal_horas: Optional[int] = 40
     is_active: bool
     fecha_fin_suscripcion: Optional[datetime] = None
     fecha_registro: Optional[datetime] = None

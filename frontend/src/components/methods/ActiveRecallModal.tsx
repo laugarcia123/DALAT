@@ -26,11 +26,13 @@ import {
   Flame,
 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { studySessionService } from "@/services/studySessionService";
 
 interface ActiveRecallModalProps {
   isOpen: boolean;
   onClose: () => void;
   isLightMode?: boolean;
+  onSessionCompleted?: () => void;
 }
 
 export interface Flashcard {
@@ -206,6 +208,7 @@ export default function ActiveRecallModal({
   isOpen,
   onClose,
   isLightMode = false,
+  onSessionCompleted,
 }: ActiveRecallModalProps) {
   // Paso actual de la línea de meta (1 a 5, o 6 si ya completó)
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -370,6 +373,20 @@ export default function ActiveRecallModal({
       setCompletedSteps((prev) => [...prev, 5]);
     }
     setCurrentStep(6); // Pantalla de victoria final
+
+    // Registrar sesión completada para sumar a la racha diaria
+    const sessionDuration = Math.max(300, readingSeconds || 1800);
+    studySessionService.logSession({
+      duracion_segundos: sessionDuration,
+      materia: subjectTopic.trim() || "Recuerdo Activo",
+      completada: true,
+      tipo: "active_recall",
+      notas: "Ciclo completo de 5 pasos finalizado con éxito",
+    }).then(() => {
+      onSessionCompleted?.();
+    }).catch((err) => {
+      console.error("Error al registrar sesión de Recuerdo Activo:", err);
+    });
   };
 
   // Reset total para estudiar otro tema

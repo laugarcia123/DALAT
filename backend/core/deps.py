@@ -64,3 +64,22 @@ def get_optional_user(
     except Exception:
         pass
     return None
+
+
+def get_effective_user(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> Usuario:
+    """
+    Retorna estrictamente el usuario autenticado por Bearer Token.
+    Si no hay token o es inválido, rechaza con 401 para garantizar
+    la privacidad y segregación estricta de datos entre cuentas.
+    """
+    user = get_optional_user(authorization=authorization, db=db)
+    if user:
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sesión no válida o expirada. Por favor inicia sesión.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

@@ -32,12 +32,14 @@ class Usuario(Base):
     # Control del Modelo de Negocio / Suscripción
     tipo_plan: Mapped[TipoPlan] = mapped_column(SQLEnum(TipoPlan), default=TipoPlan.BASICO)
     fecha_fin_suscripcion: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    tokens_disponibles: Mapped[int] = mapped_column(default=10)
 
     # Banderas de estado y auditoría
+    meta_semanal_horas: Mapped[int] = mapped_column(default=40)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relación con asignaturas académicas
-    asignaturas: Mapped[List["AsignÑatura"]] = relationship(
+    asignaturas: Mapped[List["Asignatura"]] = relationship(
         "Asignatura", back_populates="usuario", cascade="all, delete-orphan"
     )

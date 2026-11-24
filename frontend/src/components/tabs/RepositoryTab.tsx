@@ -30,6 +30,7 @@ import {
   repositoryService,
   EquipoItem,
   DocumentoItem,
+  StorageQuotaInfo,
 } from "@/services/repositoryService";
 import { useAuth } from "@/context/AuthContext";
 
@@ -139,127 +140,12 @@ const PRESET_INVITE_REPOSITORIES: Record<string, Omit<EquipoItem, "id_equipo">> 
   },
 };
 
-const INITIAL_FALLBACK_EQUIPOS: EquipoItem[] = [
-  {
-    id_equipo: 1,
-    id_usuario: 1,
-    nombre: "Cálculo sin drama",
-    materia: "Cálculo III",
-    icono_iniciales: "CÁ",
-    color: "#7c5dfa",
-    es_personal: false,
-    codigo_invitacion: "dalat-calc-sin-drama",
-    miembros_count: 4,
-    documentos_count: 2,
-    documentos: [
-      {
-        id_documento: 1,
-        id_usuario: 1,
-        id_equipo: 1,
-        nombre: "Apuntes Cálculo III — Integrales dobles.pdf",
-        formato: "PDF",
-        tamano: "2.2 MB",
-        autor_nombre: "Luis Martínez",
-        fecha_creacion: "2026-09-09",
-      },
-      {
-        id_documento: 2,
-        id_usuario: 1,
-        id_equipo: 1,
-        nombre: "Guía parcial — Aplicaciones de integrales.docx",
-        formato: "MSWORD",
-        tamano: "439 KB",
-        autor_nombre: "Tú",
-        fecha_creacion: "2026-09-11",
-      },
-    ],
-  },
-  {
-    id_equipo: 2,
-    id_usuario: 1,
-    nombre: "Microeconomía",
-    materia: "Economía",
-    icono_iniciales: "MI",
-    color: "#10b981",
-    es_personal: false,
-    codigo_invitacion: "dalat-microeconomia-eco",
-    miembros_count: 3,
-    documentos_count: 2,
-    documentos: [
-      {
-        id_documento: 3,
-        id_usuario: 1,
-        id_equipo: 2,
-        nombre: "Resumen Curva de Oferta y Demanda.pdf",
-        formato: "PDF",
-        tamano: "1.8 MB",
-        autor_nombre: "Carlos Ruiz",
-        fecha_creacion: "2026-09-15",
-      },
-      {
-        id_documento: 4,
-        id_usuario: 1,
-        id_equipo: 2,
-        nombre: "Taller Práctico de Elasticidades.docx",
-        formato: "MSWORD",
-        tamano: "312 KB",
-        autor_nombre: "Tú",
-        fecha_creacion: "2026-09-18",
-      },
-    ],
-  },
-  {
-    id_equipo: 3,
-    id_usuario: 1,
-    nombre: "Proyecto final",
-    materia: "Arquitectura",
-    icono_iniciales: "PR",
-    color: "#f43f8e",
-    es_personal: false,
-    codigo_invitacion: "dalat-proyecto-final-arq",
-    miembros_count: 2,
-    documentos_count: 1,
-    documentos: [
-      {
-        id_documento: 5,
-        id_usuario: 1,
-        id_equipo: 3,
-        nombre: "Diagrama C4 y Arquitectura de Microservicios.pdf",
-        formato: "PDF",
-        tamano: "3.5 MB",
-        autor_nombre: "Daniel Granados",
-        fecha_creacion: "2026-09-20",
-      },
-    ],
-  },
-  {
-    id_equipo: 4,
-    id_usuario: 1,
-    nombre: "Mis Apuntes Personales",
-    materia: "General",
-    icono_iniciales: "AP",
-    color: "#38bdf8",
-    es_personal: true,
-    codigo_invitacion: "dalat-mis-apuntes",
-    miembros_count: 1,
-    documentos_count: 1,
-    documentos: [
-      {
-        id_documento: 6,
-        id_usuario: 1,
-        id_equipo: 4,
-        nombre: "Formulario Maestro de Integrales y Derivadas.pdf",
-        formato: "PDF",
-        tamano: "850 KB",
-        autor_nombre: "Tú",
-        fecha_creacion: "2026-09-22",
-      },
-    ],
-  },
-];
+const INITIAL_FALLBACK_EQUIPOS: EquipoItem[] = [];
 
 interface RepositoryTabProps {
   isLightMode?: boolean;
+  isPro?: boolean;
+  onGoToCheckout?: () => void;
 }
 
 
@@ -296,7 +182,11 @@ const FORMAT_OPTIONS = [
   },
 ];
 
-export default function RepositoryTab({ isLightMode = false }: RepositoryTabProps) {
+export default function RepositoryTab({
+  isLightMode = false,
+  isPro = false,
+  onGoToCheckout,
+}: RepositoryTabProps) {
   const { isAuthenticated, user: authUser } = useAuth();
 
   // Sincronización reactiva del tema claro
@@ -376,25 +266,45 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
 
   // Cargar datos reales desde el backend
   const loadRepository = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setEquipos([]);
+      return;
+    }
     try {
       setLoading(true);
       const data = await repositoryService.getEquipos();
-      if (data && data.length > 0) {
+      if (data && Array.isArray(data)) {
         setEquipos(data);
+      } else {
+        setEquipos([]);
       }
     } catch (err) {
-      console.warn("No se pudo cargar el repositorio del backend, usando datos locales:", err);
+      console.warn("No se pudo cargar el repositorio del backend:", err);
+      setEquipos([]);
     } finally {
       setLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  // Cuota de almacenamiento de repositorios
+  const [quotaInfo, setQuotaInfo] = useState<StorageQuotaInfo | null>(null);
+
+  const loadQuota = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const q = await repositoryService.getStorageQuota();
+      setQuotaInfo(q);
+    } catch (err) {
+      console.warn("No se pudo cargar la cuota de almacenamiento:", err);
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
     queueMicrotask(() => {
       loadRepository();
+      loadQuota();
     });
-  }, [loadRepository]);
+  }, [loadRepository, loadQuota]);
 
   // Filtrar equipos según tab (Equipos vs Personal)
   const filteredEquipos = equipos.filter((e) =>
@@ -415,23 +325,18 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
   const handleCopyLink = (equipo: EquipoItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const inviteCode = equipo.codigo_invitacion || `dalat-${equipo.id_equipo}`;
-    const inviteUrl = `https://dalat.app/invite/${inviteCode}`;
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const inviteUrl = `${baseUrl}/invite/${inviteCode}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedEquipoId(equipo.id_equipo);
     confetti({ particleCount: 25, spread: 45, origin: { y: 0.8 } });
     setTimeout(() => setCopiedEquipoId(null), 2500);
   };
 
-  // ========================================================
-  // UNIRSE MEDIANTE CÓDIGO DE INVITACIÓN
-  // ========================================================
-  const handleJoinByCode = (e: React.FormEvent) => {
-    e.preventDefault();
-    const raw = inviteInputCode.trim();
-    if (!raw) return;
-
-    // Normalizar slug si pegan la URL completa
-    let slug = raw;
+  // Helper para procesar unión por código o URL
+  const handleJoinBySlug = (raw: string) => {
+    if (!raw.trim()) return;
+    let slug = raw.trim();
     if (slug.includes("/invite/")) {
       slug = slug.split("/invite/").pop()?.trim() || slug;
     }
@@ -517,6 +422,14 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
   };
 
   // ========================================================
+  // UNIRSE MEDIANTE CÓDIGO DE INVITACIÓN
+  // ========================================================
+  const handleJoinByCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleJoinBySlug(inviteInputCode);
+  };
+
+  // ========================================================
   // CREAR EQUIPO
   // ========================================================
   const handleCreateEquipo = async (e: React.FormEvent) => {
@@ -539,7 +452,7 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
       color: equipoColor,
       es_personal: equipoEsPersonal,
       codigo_invitacion: `dalat-${Date.now().toString(36)}`,
-      miembros_count: equipoEsPersonal ? 1 : 3,
+      miembros_count: 1,
       documentos_count: 0,
       documentos: [],
     };
@@ -602,15 +515,48 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
     if (!docNombre.trim() || !targetRepo) return;
 
     setSubmitting(true);
-    const isLink = docFormato === "LINK";
+    const isLink = docFormato === "LINK" || Boolean(docUrl.trim()) || docNombre.trim().startsWith("http");
+    let resolvedFormato = isLink ? "LINK" : docFormato;
+
+    // Autodetección resiliente del formato real por extensión
+    if (!isLink) {
+      const checkName = (uploadedFileObj?.name || docNombre).toLowerCase();
+      if (checkName.endsWith(".docx") || checkName.endsWith(".doc")) {
+        resolvedFormato = "MSWORD";
+      } else if (checkName.endsWith(".pptx") || checkName.endsWith(".ppt")) {
+        resolvedFormato = "PPT";
+      } else if (checkName.endsWith(".pdf")) {
+        resolvedFormato = "PDF";
+      } else if (checkName.endsWith(".zip") || checkName.endsWith(".rar") || checkName.endsWith(".7z") || checkName.endsWith(".tar") || checkName.endsWith(".gz")) {
+        resolvedFormato = "ZIP";
+      } else if (checkName.endsWith(".txt") || checkName.endsWith(".md")) {
+        resolvedFormato = "TXT";
+      }
+    }
+
     let finalTamano = "1.0 MB";
+    let sizeMb = 1.0;
     if (isLink) {
       finalTamano = "Enlace";
+      sizeMb = 0.01;
     } else if (uploadedFileObj) {
+      sizeMb = uploadedFileObj.size / (1024 * 1024);
       finalTamano =
         uploadedFileObj.size >= 1024 * 1024
           ? `${(uploadedFileObj.size / (1024 * 1024)).toFixed(1)} MB`
           : `${Math.max(1, Math.round(uploadedFileObj.size / 1024))} KB`;
+    }
+
+    if (quotaInfo && quotaInfo.usado_mb + sizeMb > quotaInfo.limite_mb) {
+      alert(
+        `Límite de almacenamiento alcanzado (${quotaInfo.limite_texto}). ${
+          isPro
+            ? "Por favor elimina documentos antiguos para liberar espacio."
+            : "Mejora a Plan PRO para obtener 2 GB de almacenamiento."
+        }`
+      );
+      setSubmitting(false);
+      return;
     }
 
     const localId = (targetRepo.documentos?.length || 0) + 101;
@@ -620,7 +566,7 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
       id_usuario: 1,
       id_equipo: targetRepo.id_equipo,
       nombre: docNombre.trim(),
-      formato: docFormato,
+      formato: resolvedFormato,
       tamano: finalTamano,
       url_recurso: isLink ? docUrl.trim() || undefined : undefined,
       autor_nombre: authUser?.name || "Tú",
@@ -629,14 +575,26 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
 
     if (isAuthenticated) {
       try {
-        const created = await repositoryService.createDocumento({
-          id_equipo: targetRepo.id_equipo,
-          nombre: tempDoc.nombre,
-          formato: tempDoc.formato,
-          tamano: tempDoc.tamano,
-          url_recurso: tempDoc.url_recurso,
-          autor_nombre: tempDoc.autor_nombre,
-        });
+        let created: DocumentoItem;
+        if (!isLink && uploadedFileObj) {
+          // Subida real a Cloudflare R2 a través del backend
+          const formData = new FormData();
+          formData.append("file", uploadedFileObj);
+          if (targetRepo.id_equipo) {
+            formData.append("id_equipo", String(targetRepo.id_equipo));
+          }
+          formData.append("formato", resolvedFormato);
+          created = await repositoryService.uploadDocumentoFile(formData);
+        } else {
+          created = await repositoryService.createDocumento({
+            id_equipo: targetRepo.id_equipo,
+            nombre: tempDoc.nombre,
+            formato: tempDoc.formato,
+            tamano: tempDoc.tamano,
+            url_recurso: tempDoc.url_recurso,
+            autor_nombre: tempDoc.autor_nombre,
+          });
+        }
 
         setEquipos((prev) =>
           prev.map((eq) => {
@@ -651,6 +609,7 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
             return eq;
           })
         );
+        await loadQuota();
       } catch (err) {
         console.error("Error al guardar documento en backend:", err);
         setEquipos((prev) =>
@@ -718,6 +677,7 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
     if (isAuthenticated) {
       try {
         await repositoryService.deleteDocumento(id_documento);
+        await loadQuota();
       } catch (err) {
         console.error("Error al eliminar documento en backend:", err);
       }
@@ -729,9 +689,23 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
   // ========================================================
   const handleOpenDoc = (doc: DocumentoItem) => {
     if (doc.url_recurso) {
-      window.open(doc.url_recurso, "_blank");
+      let finalUrl = doc.url_recurso.trim();
+      if (!/^https?:\/\//i.test(finalUrl)) {
+        finalUrl = `https://${finalUrl}`;
+      }
+      window.open(finalUrl, "_blank", "noopener,noreferrer");
     } else {
-      alert(`Abriendo / Descargando recurso: "${doc.nombre}"`);
+      // Si es un documento sin enlace externo, creamos una vista previa descargable
+      const dummyContent = `Dalat Repositorio Académico\nDocumento: ${doc.nombre}\nAutor: ${doc.autor_nombre}\nFormato: ${doc.formato}\nTamaño: ${doc.tamano || "1.0 MB"}\nFecha: ${doc.fecha_creacion || "2026-11-22"}`;
+      const blob = new Blob([dummyContent], { type: "text/plain;charset=utf-8" });
+      const blobUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = blobUrl;
+      downloadLink.download = doc.nombre.endsWith(`.${doc.formato.toLowerCase()}`) ? doc.nombre : `${doc.nombre}.txt`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(blobUrl);
     }
   };
 
@@ -746,7 +720,7 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
       {viewingEquipoId === null ? (
         <div className="space-y-6">
           {/* Top Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <h2
@@ -768,24 +742,74 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
               </p>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            {/* Storage Quota Card & Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full xl:w-auto">
+              {/* Card de Cuota de Almacenamiento */}
+              <div className={`p-4 rounded-2xl border w-full sm:w-80 space-y-2.5 shrink-0 ${
+                activeLight ? "bg-white border-slate-200/90 shadow-sm" : "bg-[#0c0e18] border-[#171c2f]"
+              }`}>
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className={`font-semibold flex items-center gap-2 min-w-0 ${activeLight ? "text-slate-700" : "text-slate-200"}`}>
+                    <div className="w-6 h-6 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center shrink-0 text-purple-600 dark:text-purple-400">
+                      <FolderArchive className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="truncate">Almacenamiento</span>
+                  </span>
+                  <div className="flex items-baseline gap-1 font-mono text-xs shrink-0">
+                    <span className="font-bold text-purple-600 dark:text-purple-400">
+                      {quotaInfo ? quotaInfo.usado_mb : "0"} MB
+                    </span>
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                      / {quotaInfo ? quotaInfo.limite_texto : (isPro ? "2 GB" : "70 MB")}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="w-full bg-slate-100 dark:bg-slate-800/80 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 dark:border-slate-700/50">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      (quotaInfo?.porcentaje_usado || 0) > 90
+                        ? "bg-rose-500"
+                        : (quotaInfo?.porcentaje_usado || 0) > 70
+                        ? "bg-amber-500"
+                        : "bg-gradient-to-r from-purple-500 to-indigo-600 shadow-sm"
+                    }`}
+                    style={{ width: `${Math.max(2, quotaInfo?.porcentaje_usado || 0)}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className="font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
+                    <span>{isPro ? "Plan PRO (2 GB)" : "Plan Básico (70 MB)"}</span>
+                  </span>
+                  {!isPro && onGoToCheckout && (
+                    <button
+                      type="button"
+                      onClick={onGoToCheckout}
+                      className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors inline-flex items-center gap-1 shrink-0 cursor-pointer group"
+                    >
+                      <span>Mejorar a 2 GB</span>
+                      <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <button
                 onClick={() => {
                   setEquipoEsPersonal(activeTabFilter === "personal");
                   setIsEquipoModalOpen(true);
                 }}
-                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer ${
+                className={`inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 cursor-pointer shrink-0 shadow-sm ${
                   activeLight
-                    ? "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm"
-                    : "bg-[#141829] hover:bg-[#1f253f] border border-[#232945] text-slate-200 hover:text-white"
+                    ? "bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white shadow-purple-500/20"
+                    : "bg-[#7c5dfa] hover:bg-[#6c4ae8] text-white shadow-purple-900/30"
                 }`}
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>{activeTabFilter === "personal" ? "Nuevo espacio" : "Crear equipo"}</span>
               </button>
-
-
             </div>
           </div>
 
@@ -929,7 +953,37 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
           {/* CUADROS DE REPOSITORIOS (GRID VIEW)                      */}
           {/* ======================================================== */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredEquipos.map((team) => {
+            {filteredEquipos.length === 0 ? (
+              <div
+                className={`col-span-full rounded-2xl border p-12 text-center space-y-4 ${
+                  activeLight ? "bg-white border-slate-200" : "bg-[#0c0e18] border-[#171c2f]"
+                }`}
+              >
+                <div className="w-14 h-14 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
+                  <Folder className="w-7 h-7" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className={`text-base font-bold ${activeLight ? "text-slate-900" : "text-white"}`}>
+                    No tienes repositorios ni carpetas creadas
+                  </h3>
+                  <p className={`text-xs max-w-sm mx-auto ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
+                    Crea tu primer equipo de estudio o espacio personal para organizar tus archivos y apuntes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEquipoEsPersonal(activeTabFilter === "personal");
+                    setIsEquipoModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Crear primer repositorio</span>
+                </button>
+              </div>
+            ) : (
+              filteredEquipos.map((team) => {
               const isCopied = copiedEquipoId === team.id_equipo;
               return (
                 <div
@@ -1014,7 +1068,9 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
                         ) : (
                           <>
                             <Users className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>{team.miembros_count} miembros</span>
+                            <span>
+                              {team.miembros_count || 1} {(team.miembros_count || 1) === 1 ? "miembro" : "miembros"}
+                            </span>
                           </>
                         )}
                       </div>
@@ -1027,7 +1083,9 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
                         }`}
                       >
                         <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>{team.documentos?.length || 0} materiales</span>
+                        <span>
+                          {team.documentos?.length || 0} {(team.documentos?.length || 0) === 1 ? "material" : "materiales"}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1074,7 +1132,7 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
                   </div>
                 </div>
               );
-            })}
+            }))}
 
             {/* Cuadro para Crear Nuevo Repositorio */}
             <div
@@ -1130,13 +1188,26 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
                 <span>Volver a todos los repositorios</span>
               </button>
 
-              <button
-                onClick={() => setIsDocModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold shadow-md shadow-indigo-500/20 transition active:scale-95 cursor-pointer"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Subir archivo / Enlace</span>
-              </button>
+              <div className="flex items-center gap-3">
+                {quotaInfo && (
+                  <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs ${
+                    activeLight ? "bg-white border-slate-200 text-slate-700" : "bg-[#141829] border-[#232945] text-slate-300"
+                  }`}>
+                    <span className="text-[11px] text-slate-400">Cuota:</span>
+                    <span className="font-mono font-bold text-purple-500">
+                      {quotaInfo.usado_mb} MB / {quotaInfo.limite_texto}
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setIsDocModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold shadow-md shadow-indigo-500/20 transition active:scale-95 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Subir archivo / Enlace</span>
+                </button>
+              </div>
             </div>
 
             {/* Repository Banner Showcase */}
@@ -1177,7 +1248,7 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
                   <p className={`text-xs ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
                     {viewingEquipo.es_personal
                       ? "Tus notas, resúmenes y documentos personales de estudio."
-                      : `${viewingEquipo.miembros_count} miembros colaborando en este repositorio. Comparte recursos mediante el enlace.`}
+                      : `${viewingEquipo.miembros_count || 1} ${(viewingEquipo.miembros_count || 1) === 1 ? "miembro" : "miembros"} en este repositorio. Comparte recursos mediante el enlace.`}
                   </p>
                 </div>
               </div>
@@ -1736,6 +1807,19 @@ export default function RepositoryTab({ isLightMode = false }: RepositoryTabProp
                         setUploadedFileObj(file);
                         if (!docNombre.trim()) {
                           setDocNombre(file.name);
+                        }
+                        // Autodetectar formato en el selector de tipo
+                        const ext = file.name.split(".").pop()?.toLowerCase();
+                        if (ext === "docx" || ext === "doc") {
+                          setDocFormato("MSWORD");
+                        } else if (ext === "pptx" || ext === "ppt") {
+                          setDocFormato("PPT");
+                        } else if (ext === "pdf") {
+                          setDocFormato("PDF");
+                        } else if (ext === "zip" || ext === "rar" || ext === "7z") {
+                          setDocFormato("ZIP");
+                        } else if (ext === "txt" || ext === "md") {
+                          setDocFormato("TXT");
                         }
                       }
                     }}

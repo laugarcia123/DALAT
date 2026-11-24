@@ -23,11 +23,13 @@ import {
   Unlock,
 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { studySessionService } from "@/services/studySessionService";
 
 interface SpacedRepetitionModalProps {
   isOpen: boolean;
   onClose: () => void;
   isLightMode?: boolean;
+  onSessionCompleted?: () => void;
 }
 
 export interface DayBlock {
@@ -87,6 +89,7 @@ export default function SpacedRepetitionModal({
   isOpen,
   onClose,
   isLightMode = false,
+  onSessionCompleted,
 }: SpacedRepetitionModalProps) {
   // Lista de planes por materia guardados en localStorage
   const [plans, setPlans] = useState<SubjectPlan[]>([]);
@@ -206,6 +209,21 @@ export default function SpacedRepetitionModal({
     const updatedPlan = { ...activePlan, days: updatedDays };
     const updatedPlans = plans.map((p) => (p.id === activePlan.id ? updatedPlan : p));
     savePlans(updatedPlans);
+
+    // Registrar sesión de estudio para sumar a la racha diaria
+    const targetDay = activePlan.days.find((d) => d.dayNumber === dayNum);
+    const durationMins = targetDay?.minutes || 60;
+    studySessionService.logSession({
+      duracion_segundos: durationMins * 60,
+      materia: activePlan.subjectName || "Repetición Espaciada",
+      completada: true,
+      tipo: "spaced_repetition",
+      notas: `Día ${dayNum} completado en plan ${activePlan.subjectName}`,
+    }).then(() => {
+      onSessionCompleted?.();
+    }).catch((err) => {
+      console.error("Error al registrar sesión de Repetición Espaciada:", err);
+    });
 
     // Avanzar automáticamente al siguiente día no completado
     const nextIncomplete = updatedDays.find((d) => !d.isCompleted && d.dayNumber > dayNum);

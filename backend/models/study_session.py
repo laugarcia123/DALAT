@@ -16,7 +16,7 @@ class SesionEstudio(Base):
     tipo = Column(String(50), default="zen")  # zen, pomodoro, libre
     notas = Column(String(250), nullable=True)
 
-    fecha_sesion = Column(DateTime, default=datetime.utcnow, index=True)
+    fecha_sesion = Column(DateTime, default=datetime.now, index=True)
 
     # Relación
     usuario = relationship("Usuario", backref="sesiones_estudio")

@@ -8,7 +8,6 @@ if BACKEND_DIR not in sys.path:
 from db.database import SessionLocal, Base, engine
 import models.user
 import models.subject
-import models.ai_resource
 from schemas.ai_resource import GenerarRecursoRequest
 from services.ai_service import AIService
 

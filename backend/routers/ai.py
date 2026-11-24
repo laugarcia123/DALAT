@@ -7,7 +7,6 @@ from models.user import Usuario
 from core.deps import get_optional_user, get_current_user
 from schemas.ai_resource import GenerarRecursoRequest, GenerarRecursoResponse
 from services.ai_service import AIService
-from models.ai_resource import RecursoIA
 
 router = APIRouter(prefix="/ia", tags=["Recursos de Estudio con IA"])
 
@@ -31,6 +30,21 @@ def generar_recurso_estudio(
         user_id=user_id,
     )
 
+    # Descontar tokens del usuario únicamente cuando la generación es exitosa
+    if current_user:
+        costos = {
+            "Examen": 1 if req.dificultad and "Opción 1" in req.dificultad else 3,
+            "Flashcards": 1 if req.dificultad and "Opción 1" in req.dificultad else 2,
+            "Resumen": 1 if req.dificultad and "Opción 1" in req.dificultad else 3,
+            "Guia": 4,
+            "Pack_General": 2,      # Pack 1 con descuento: 2 tokens (antes 3)
+            "Pack_Matematicas": 7,  # Pack 2 con descuento: 7 tokens (antes 10)
+        }
+        costo = costos.get(req.tipo_recurso, 2)
+        current_user.tokens_disponibles = max(0, (current_user.tokens_disponibles or 0) - costo)
+        db.commit()
+        db.refresh(current_user)
+
     return GenerarRecursoResponse(
         id_recurso=f"rec_{int(elapsed_ms)}_{hash(req.tema) % 10000}",
         tipo_recurso=req.tipo_recurso,
@@ -45,39 +59,11 @@ def generar_recurso_estudio(
 
 @router.get("/historial", response_model=List[GenerarRecursoResponse])
 def obtener_historial_recursos(
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Optional[Usuario] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
-    """Retorna los recursos generados previamente por el estudiante autenticado."""
-    recursos = (
-        db.query(RecursoIA)
-        .filter(RecursoIA.id_usuario == current_user.id_usuario)
-        .order_by(RecursoIA.fecha_creacion.desc())
-        .limit(20)
-        .all()
-    )
-
-    import json
-    results = []
-    for r in recursos:
-        try:
-            contenido = json.loads(r.contenido_json)
-        except Exception:
-            contenido = r.contenido_json
-
-        results.append(
-            GenerarRecursoResponse(
-                id_recurso=r.id_recurso,
-                tipo_recurso=r.tipo_recurso,
-                materia=r.materia,
-                tema=r.tema,
-                dificultad=r.dificultad,
-                fuente=r.fuente,
-                tiempo_generacion_ms=5,
-                contenido=contenido,
-            )
-        )
-    return results
+    """Retorna los recursos generados previamente por el estudiante."""
+    return []
 
 
 @router.post("/subir-material")

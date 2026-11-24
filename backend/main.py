@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from db.database import engine, Base
 import models.user         # Registra Usuario en Base.metadata
 import models.subject      # Registra Asignatura y Evaluacion en Base.metadata
-import models.ai_resource  # Registra RecursoIA en Base.metadata
 import models.task         # Registra Tarea en Base.metadata
 import models.schedule     # Registra HorarioClase en Base.metadata
 import models.repository   # Registra EquipoEstudio y DocumentoRepositorio en Base.metadata

@@ -3,11 +3,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Play, Pause, RotateCcw, HelpCircle, Coffee, Flame, Trophy, FastForward, Target, Sparkles, ArrowRight, Lightbulb } from "lucide-react";
 import confetti from "canvas-confetti";
+import { studySessionService } from "@/services/studySessionService";
 
 interface PomodoroModalProps {
   isOpen: boolean;
   onClose: () => void;
   isLightMode?: boolean;
+  onSessionCompleted?: () => void;
 }
 
 // Sonido suave de campana con Web Audio API
@@ -97,7 +99,7 @@ function CuteTomatoCharacter({ mood = "focus" }: { mood?: "focus" | "break" | "v
   );
 }
 
-export default function PomodoroModal({ isOpen, onClose, isLightMode = false }: PomodoroModalProps) {
+export default function PomodoroModal({ isOpen, onClose, isLightMode = false, onSessionCompleted }: PomodoroModalProps) {
   const FOCUS_TIME = 25 * 60; // 25 min en segundos
   const BREAK_TIME = 5 * 60; // 5 min en segundos
 
@@ -128,6 +130,19 @@ export default function PomodoroModal({ isOpen, onClose, isLightMode = false }: 
   // Transición de fase
   const handlePhaseTransition = () => {
     if (!isBreak) {
+      // Registrar sesión de estudio completada para sumar racha diaria
+      studySessionService.logSession({
+        duracion_segundos: FOCUS_TIME,
+        materia: "Pomodoro",
+        completada: true,
+        tipo: "pomodoro",
+        notas: `Bloque ${currentCycle} de Pomodoro completado`,
+      }).then(() => {
+        onSessionCompleted?.();
+      }).catch((err) => {
+        console.error("Error al registrar sesión Pomodoro:", err);
+      });
+
       if (currentCycle < 4) {
         setIsBreak(true);
         setTimeLeft(BREAK_TIME);

@@ -15,6 +15,7 @@ export interface UserProfile {
   avatarColor: string;
   isInstitutional?: boolean;
   plan?: string;
+  tokensBalance?: number;
   targetGpa?: string;
   studyStreakDays?: number;
   totalStudyHours?: number;
@@ -27,49 +28,40 @@ interface AuthContextType {
   error: string | null;
   login: (payload: LoginPayload) => Promise<UserProfile>;
   register: (payload: RegisterPayload) => Promise<UserProfile>;
+  socialLogin: (provider: string, email?: string) => Promise<UserProfile>;
   updateProfile: (updatedData: Partial<UserProfile>) => Promise<UserProfile>;
+  upgradePlan: (plan: string, tokens?: number) => Promise<UserProfile>;
+  deductTokens: (amount: number) => Promise<number>;
   logout: () => void;
   clearError: () => void;
 }
-
-const DEFAULT_DEMO_USER: UserProfile = {
-  name: "Andrea",
-  email: "andrea.gomez@universidad.edu",
-  career: "Ingeniería de Sistemas",
-  university: "Universidad Central",
-  semester: "6to Semestre",
-  bio: "Estudiante enfocada en cálculo multivariable, algoritmos y diseño de sistemas.",
-  avatarColor: "#5828c6",
-  isInstitutional: false,
-  plan: "basico",
-  targetGpa: "4.7 / 5.0",
-  studyStreakDays: 14,
-  totalStudyHours: 52.4,
-};
 
 function mapBackendUserToProfile(backendUser: UserBackend): UserProfile {
   return {
     id: backendUser.id_usuario,
     name: backendUser.nombre,
     email: backendUser.email,
-    career: backendUser.carrera || "Carrera no especificada",
-    university: backendUser.universidad || "Universidad",
-    semester: backendUser.semestre || "Semestre actual",
+    career: backendUser.carrera || "",
+    university: backendUser.universidad || (backendUser.es_institucional ? "Institución Asociada" : ""),
+    semester: backendUser.semestre || "",
     bio: backendUser.biografia || "",
     avatarColor: backendUser.avatar_color || "#7c5dfa",
     isInstitutional: backendUser.es_institucional,
     plan: backendUser.tipo_plan,
+    tokensBalance:
+      backendUser.tokens_disponibles ??
+      (backendUser.es_institucional ? 500 : backendUser.tipo_plan === "pro" ? 150 : 10),
     targetGpa: "4.5 / 5.0",
-    studyStreakDays: 14,
-    totalStudyHours: 52.4,
+    studyStreakDays: 0,
+    totalStudyHours: 0,
   };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(DEFAULT_DEMO_USER);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = getStoredToken();
       if (!token) {
         setIsLoading(false);
+        setUser(null);
+        setIsAuthenticated(false);
         return;
       }
 
@@ -89,7 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(true);
       } catch (err: any) {
         console.warn("[Auth] No se pudo restaurar sesión previa:", err?.message);
-        // Si el token es inválido o el backend no responde, mantenemos el demo user si ya estaba
+        authService.logout();
+        setUser(null);
+        setIsAuthenticated(false);
       } finally {
         setIsLoading(false);
       }
@@ -109,6 +105,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return profile;
     } catch (err: any) {
       const message = err?.message || "Error al iniciar sesión.";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const socialLogin = async (provider: string, email?: string): Promise<UserProfile> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await authService.socialLogin(provider, email);
+      const profile = mapBackendUserToProfile(response.user);
+      setUser(profile);
+      setIsAuthenticated(true);
+      return profile;
+    } catch (err: any) {
+      const message = err?.message || "Error al iniciar sesión rápida.";
       setError(message);
       throw err;
     } finally {
@@ -147,17 +161,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           semestre: updatedData.semester,
           biografia: updatedData.bio,
           avatar_color: updatedData.avatarColor,
+          tipo_plan: updatedData.plan,
+          tokens_disponibles: updatedData.tokensBalance,
         });
         const profile = mapBackendUserToProfile(backendUpdated);
         setUser(profile);
         return profile;
       } else {
-        // Modo demo local
+        // Actualización en memoria si no hay token
         setUser((prev) => {
-          if (!prev) return DEFAULT_DEMO_USER;
+          if (!prev) return null;
           return { ...prev, ...updatedData };
         });
-        return { ...(user || DEFAULT_DEMO_USER), ...updatedData };
+        return { ...(user || ({} as UserProfile)), ...updatedData };
       }
     } catch (err: any) {
       const message = err?.message || "Error al actualizar el perfil.";
@@ -166,6 +182,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const upgradePlan = async (plan: string, tokens?: number): Promise<UserProfile> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (getStoredToken()) {
+        const backendUpdated = await authService.upgradePlan(plan, tokens);
+        const profile = mapBackendUserToProfile(backendUpdated);
+        setUser(profile);
+        return profile;
+      } else {
+        setUser((prev) => {
+          if (!prev) return null;
+          return { ...prev, plan, tokensBalance: tokens ?? (plan === "pro" ? 150 : 10) };
+        });
+        return { ...(user || ({} as UserProfile)), plan, tokensBalance: tokens ?? 150 };
+      }
+    } catch (err: any) {
+      const message = err?.message || "Error al actualizar el plan.";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deductTokens = async (amount: number): Promise<number> => {
+    try {
+      if (getStoredToken()) {
+        const updated = await authService.deductTokens(amount);
+        const newBalance = updated.tokens_disponibles ?? 0;
+        setUser((prev) => (prev ? { ...prev, tokensBalance: newBalance } : null));
+        return newBalance;
+      }
+    } catch (err: any) {
+      console.warn("[Auth] Error descontando tokens en backend:", err);
+    }
+    return 0;
   };
 
   const logout = () => {
@@ -185,7 +240,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         login,
         register,
+        socialLogin,
         updateProfile,
+        upgradePlan,
+        deductTokens,
         logout,
         clearError,
       }}

@@ -36,9 +36,20 @@ export interface StudySessionCreatePayload {
 export const studySessionService = {
   /**
    * Obtiene las métricas en tiempo real de racha, horas semanales y meta.
+   * Si no se especifica metaHoras, el backend utiliza la meta guardada en la base de datos.
    */
-  async getStats(metaHoras: number = 40.0): Promise<StudySessionStats> {
-    return apiFetch<StudySessionStats>(`/sesiones/stats?meta_horas=${metaHoras}`);
+  async getStats(metaHoras?: number): Promise<StudySessionStats> {
+    const query = typeof metaHoras === "number" ? `?meta_horas=${metaHoras}` : "";
+    return apiFetch<StudySessionStats>(`/sesiones/stats${query}`);
+  },
+
+  /**
+   * Guarda la meta semanal de horas en la base de datos (tabla usuarios).
+   */
+  async updateWeeklyGoal(metaHoras: number): Promise<{ meta_semanal_horas: number; status: string }> {
+    return apiFetch<{ meta_semanal_horas: number; status: string }>(`/sesiones/meta-semanal?meta_horas=${metaHoras}`, {
+      method: "PUT",
+    });
   },
 
   /**
