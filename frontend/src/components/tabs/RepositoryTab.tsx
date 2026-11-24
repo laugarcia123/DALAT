@@ -24,6 +24,7 @@ import {
   Presentation,
   FolderArchive,
   ChevronDown,
+  Pencil,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import {
@@ -259,6 +260,11 @@ export default function RepositoryTab({
     count?: number;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Modal de renombrar documento
+  const [renamingDoc, setRenamingDoc] = useState<{ id: number; name: string } | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
 
   // Form State Equipo
   const [equipoNombre, setEquipoNombre] = useState("");
@@ -625,6 +631,9 @@ export default function RepositoryTab({
           // Subida real a Cloudflare R2 a través del backend
           const formData = new FormData();
           formData.append("file", uploadedFileObj);
+          if (docNombre.trim()) {
+            formData.append("nombre", docNombre.trim());
+          }
           if (targetRepo.id_equipo) {
             formData.append("id_equipo", String(targetRepo.id_equipo));
           }
@@ -759,6 +768,39 @@ export default function RepositoryTab({
     } finally {
       setIsDeleting(false);
       setDeleteTarget(null);
+    }
+  };
+
+  // ========================================================
+  // GUARDAR RENOMBRE DE DOCUMENTO
+  // ========================================================
+  const handleSaveRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renamingDoc || !renameInput.trim()) return;
+    setIsRenaming(true);
+    const newName = renameInput.trim();
+
+    try {
+      setEquipos((prev) =>
+        prev.map((eq) => {
+          if (eq.id_equipo === viewingEquipo?.id_equipo) {
+            const updatedDocs = (eq.documentos || []).map((d) =>
+              d.id_documento === renamingDoc.id ? { ...d, nombre: newName } : d
+            );
+            return { ...eq, documentos: updatedDocs };
+          }
+          return eq;
+        })
+      );
+
+      if (isAuthenticated) {
+        await repositoryService.updateDocumento(renamingDoc.id, { nombre: newName });
+      }
+      setRenamingDoc(null);
+    } catch (err) {
+      console.error("Error al renombrar documento:", err);
+    } finally {
+      setIsRenaming(false);
     }
   };
 
@@ -1475,14 +1517,28 @@ export default function RepositoryTab({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteDocumento(doc.id_documento, e)}
-                        title="Eliminar archivo"
-                        className="text-slate-400 hover:text-rose-500 p-1 rounded-lg transition opacity-40 group-hover:opacity-100 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRenamingDoc({ id: doc.id_documento, name: doc.nombre });
+                            setRenameInput(doc.nombre);
+                          }}
+                          title="Cambiar título o renombrar"
+                          className="text-slate-400 hover:text-indigo-500 p-1 rounded-lg transition hover:bg-indigo-50 dark:hover:bg-indigo-950/30 cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteDocumento(doc.id_documento, e)}
+                          title="Eliminar archivo"
+                          className="text-slate-400 hover:text-rose-500 p-1 rounded-lg transition hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div
@@ -2151,6 +2207,112 @@ export default function RepositoryTab({
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL PARA RENOMBRAR / EDITAR TÍTULO DE DOCUMENTO        */}
+      {/* ======================================================== */}
+      {renamingDoc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => !isRenaming && setRenamingDoc(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-md rounded-3xl p-6 sm:p-7 relative overflow-hidden shadow-2xl transition-all border animate-in zoom-in-95 duration-200 ${
+              activeLight
+                ? "bg-white/95 border-slate-200/90 text-slate-900 shadow-indigo-950/10"
+                : "bg-[#0d1020] border-[#222846] text-white shadow-2xl shadow-indigo-950/20"
+            }`}
+          >
+            {/* Ambient Purple Glow */}
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => !isRenaming && setRenamingDoc(null)}
+              disabled={isRenaming}
+              className={`absolute top-4 right-4 p-1.5 rounded-xl transition cursor-pointer ${
+                activeLight
+                  ? "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.06]"
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Pencil Badge */}
+            <div className="relative mx-auto mb-4 w-14 h-14 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-500 shadow-sm shadow-indigo-500/20">
+              <Pencil className="w-6 h-6 stroke-[2.2]" />
+            </div>
+
+            {/* Title & Info */}
+            <div className="text-center space-y-1.5">
+              <h3 className={`text-lg sm:text-xl font-bold tracking-tight ${activeLight ? "text-slate-900" : "text-white"}`}>
+                Renombrar Documento
+              </h3>
+              <p className={`text-xs ${activeLight ? "text-slate-500" : "text-slate-400"}`}>
+                El nuevo título que elijas se mostrará en todos tus materiales y en los Recursos IA.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveRename} className="space-y-4 mt-5">
+              <div>
+                <label className={`block text-xs font-semibold mb-1.5 ${activeLight ? "text-slate-700" : "text-slate-300"}`}>
+                  Título personalizado del archivo
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={renameInput}
+                  onChange={(e) => setRenameInput(e.target.value)}
+                  placeholder="Ej: Derecho Administrativo - Actos y Recursos"
+                  className={`w-full rounded-xl px-3.5 py-2.5 text-xs sm:text-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+                    activeLight
+                      ? "bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500"
+                      : "bg-[#141829] border border-[#232948] text-white focus:border-indigo-500"
+                  }`}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-[#1a2038]">
+                <button
+                  type="button"
+                  onClick={() => setRenamingDoc(null)}
+                  disabled={isRenaming}
+                  className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer ${
+                    activeLight
+                      ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                      : "bg-[#161a30] hover:bg-[#1e2342] text-slate-300 border border-[#252c4b]"
+                  }`}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isRenaming || !renameInput.trim()}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold shadow-lg shadow-indigo-500/25 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isRenaming ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Guardar título</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

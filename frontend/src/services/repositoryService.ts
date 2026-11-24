@@ -153,6 +153,19 @@ export const repositoryService = {
   },
 
   /**
+   * Actualiza el título o descripción de un documento existente.
+   */
+  async updateDocumento(
+    id_documento: number,
+    payload: { nombre?: string; descripcion?: string }
+  ): Promise<DocumentoItem> {
+    return apiFetch<DocumentoItem>(`/repositorio/documentos/${id_documento}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
    * Elimina un documento del repositorio.
    */
   async deleteDocumento(

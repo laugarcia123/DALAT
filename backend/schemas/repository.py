@@ -17,6 +17,11 @@ class DocumentoCreate(DocumentoBase):
     pass
 
 
+class DocumentoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+
+
 class DocumentoResponse(DocumentoBase):
     id_documento: int
     id_usuario: int

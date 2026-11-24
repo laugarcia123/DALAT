@@ -10,6 +10,7 @@ from schemas.repository import (
     EquipoCreate,
     EquipoResponse,
     DocumentoCreate,
+    DocumentoUpdate,
     DocumentoResponse,
 )
 from crud.repository import (
@@ -275,6 +276,7 @@ def agregar_documento(
 @router.post("/upload", response_model=DocumentoResponse, status_code=status.HTTP_201_CREATED)
 async def subir_documento_r2(
     file: UploadFile = File(...),
+    nombre: Optional[str] = Form(None),
     id_equipo: Optional[int] = Form(None),
     formato: Optional[str] = Form(None),
     current_user: Usuario = Depends(get_current_user),
@@ -282,7 +284,8 @@ async def subir_documento_r2(
 ):
     """
     Sube un archivo real directamente al almacenamiento Cloudflare R2,
-    verifica cuotas y crea el registro de documento en la base de datos.
+    verifica cuotas y crea el registro de documento en la base de datos
+    utilizando prioritariamente el título personalizado que el usuario escribió en el formulario.
     """
     contents = await file.read()
     file_size_bytes = len(contents)
@@ -328,10 +331,13 @@ async def subir_documento_r2(
         content_type=content_type
     )
 
+    # Priorizar el nombre o título que el usuario escribió en el formulario del modal
+    user_chosen_name = nombre.strip() if (nombre and nombre.strip()) else file.filename
+
     # Registrar en la base de datos
     doc_in = DocumentoCreate(
         id_equipo=id_equipo,
-        nombre=file.filename,
+        nombre=user_chosen_name,
         formato=final_formato,
         tamano=tamano_texto,
         url_recurso=download_url,
@@ -369,6 +375,36 @@ def descargar_documento_repositorio(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="El archivo no tiene una URL de descarga válida.",
     )
+
+
+@router.patch("/documentos/{id_documento}", response_model=DocumentoResponse)
+def actualizar_documento_repositorio(
+    id_documento: int,
+    doc_in: DocumentoUpdate,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permite renombrar o actualizar el título y descripción de un documento existente."""
+    doc = db.query(DocumentoRepositorio).filter(
+        DocumentoRepositorio.id_documento == id_documento,
+        DocumentoRepositorio.id_usuario == current_user.id_usuario
+    ).first()
+
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Documento no encontrado o no autorizado.",
+        )
+
+    if doc_in.nombre is not None and doc_in.nombre.strip():
+        doc.nombre = doc_in.nombre.strip()
+
+    if doc_in.descripcion is not None:
+        doc.descripcion = doc_in.descripcion.strip()
+
+    db.commit()
+    db.refresh(doc)
+    return doc
 
 
 @router.delete("/documentos/{id_documento}")
