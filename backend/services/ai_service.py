@@ -37,9 +37,9 @@ def get_gemini_api_key() -> str:
     return os.getenv("GEMINI_API_KEY", "").strip()
 
 
-def generar_con_gemini(req: GenerarRecursoRequest, api_key: str) -> Any:
+def generar_con_gemini(req: GenerarRecursoRequest, api_key: str, pdf_base64: Optional[str] = None) -> Any:
     """
-    Invoca la API de Google Gemini (gemini-1.5-flash / gemini-2.0-flash / gemini-2.5-flash)
+    Invoca la API de Google Gemini (Multimodal con soporte directo de PDF / OCR)
     para generar contenido académico real, dinámico y estructurado en JSON.
     """
     tipo = req.tipo_recurso.lower()
@@ -51,7 +51,7 @@ def generar_con_gemini(req: GenerarRecursoRequest, api_key: str) -> Any:
 
     contexto_prompt = ""
     if contexto:
-        contexto_prompt = f"\nUsa prioritariamente el siguiente material o texto de estudio como base:\n---\n{contexto[:5000]}\n---\n"
+        contexto_prompt = f"\nUsa prioritariamente el siguiente material o texto de estudio como base:\n---\n{contexto[:8000]}\n---\n"
 
     if tipo == "examen":
         prompt = (
@@ -226,20 +226,35 @@ def generar_con_gemini(req: GenerarRecursoRequest, api_key: str) -> Any:
     # Modelos de Gemini a intentar en orden de preferencia según la API v1beta
     models = [
         "gemini-3.5-flash-lite",
-        "gemini-flash-lite-latest",
-        "gemini-3.8-flash",
-        "gemini-3-flash-preview",
         "gemini-flash-latest",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-pro-latest",
     ]
     last_error = None
     had_high_demand = False
+
+    contents_parts = []
+    if pdf_base64:
+        contents_parts.append({
+            "inlineData": {
+                "mimeType": "application/pdf",
+                "data": pdf_base64
+            }
+        })
+        prompt = (
+            "DOCUMENTO ADJUNTO: Se incluye el archivo PDF original de estudio (con su texto, páginas escaneadas, artículos, notas y conceptos).\n"
+            "DEBES BASAR EL 100% DEL CONTENIDO RIGUROSAMENTE EN ESTE DOCUMENTO ADJUNTO.\n\n"
+            + prompt
+        )
+    contents_parts.append({"text": prompt})
 
     for model_name in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         payload = {
             "contents": [
                 {
-                    "parts": [{"text": prompt}]
+                    "parts": contents_parts
                 }
             ],
             "generationConfig": {
@@ -307,7 +322,37 @@ def _generar_local_heuristico(req: GenerarRecursoRequest) -> Any:
     tema = req.tema or "Contenido de Estudio"
     dificultad = req.dificultad or "Intermedio"
 
-    examen_general_demo = [
+    texto_doc = (req.texto_adicional or "").strip()
+    if len(texto_doc) > 100:
+        import re
+        raw_sentences = [s.strip() for s in re.split(r'[\.\n;]+', texto_doc) if len(s.strip()) > 35]
+        if len(raw_sentences) >= 4:
+            examen_contextualizado = []
+            for i in range(min(req.cantidad or 5, len(raw_sentences))):
+                sent = raw_sentences[i]
+                distractor1 = f"Se contradice la premisa de que {sent[:60]}... considerándose un supuesto no aplicable."
+                distractor2 = f"El criterio normativo excluye taxativamente las condiciones descritas en el texto."
+                distractor3 = f"Únicamente tiene validez cuando se omiten las formalidades sustanciales examinadas."
+                examen_contextualizado.append({
+                    "id": i + 1,
+                    "pregunta": f"De acuerdo con el documento de estudio sobre '{materia}': ¿cuál de los siguientes enunciados refleja fielmente la premisa analizada?",
+                    "opciones": [
+                        sent,
+                        distractor1,
+                        distractor2,
+                        distractor3
+                    ],
+                    "indice_correcto": 0,
+                    "explicacion": f"El texto oficial del documento establece textualmente: '{sent}'."
+                })
+            examen_general_demo = examen_contextualizado
+        else:
+            examen_general_demo = []
+    else:
+        examen_general_demo = []
+
+    if not examen_general_demo:
+        examen_general_demo = [
         {
             "id": 1,
             "pregunta": f"En el análisis estructural de '{tema}', ¿cuál es la razón fundamental por la que optimizar variables locales de forma aislada puede comprometer el rendimiento global del sistema?",
@@ -630,15 +675,66 @@ class AIService:
         user_id: Optional[int] = None
     ) -> Tuple[Any, str, int]:
         """
-        Genera recursos académicos reales invocando Google Gemini API.
+        Genera recursos académicos reales invocando Google Gemini API con soporte multimodal (PDF/OCR).
         Si la API está en alta demanda o agota cuota, activa el motor heurístico local garantizado.
         """
         api_key = get_gemini_api_key()
         start_time = time.time()
 
+        # 1. Intentar localizar el documento en BD para extraer su PDF real o texto
+        pdf_base64 = None
+        doc = None
+        doc_id = getattr(req, "documento_id", None)
+        if doc_id:
+            try:
+                from models.repository import Documento
+                doc = db.query(Documento).filter(Documento.id_documento == doc_id).first()
+            except Exception as e:
+                print(f"[AIService Document Lookup by ID Error] {e}")
+
+        if not doc and req.archivo_nombre:
+            try:
+                from models.repository import Documento
+                doc = db.query(Documento).filter(Documento.nombre == req.archivo_nombre).first()
+            except Exception as e:
+                print(f"[AIService Document Lookup by Name Error] {e}")
+
+        if doc and doc.url_recurso:
+            try:
+                from services.storage_service import StorageService
+                file_bytes = StorageService.get_file_bytes(doc.url_recurso)
+                if file_bytes:
+                    is_pdf = (doc.nombre or "").lower().endswith(".pdf") or "pdf" in (doc.formato or "").lower()
+                    if is_pdf:
+                        # 1.1 Extracción de texto con pypdf
+                        try:
+                            import io
+                            from pypdf import PdfReader
+                            reader = PdfReader(io.BytesIO(file_bytes))
+                            pages_txt = []
+                            for p in reader.pages[:20]:
+                                txt = p.extract_text()
+                                if txt and txt.strip():
+                                    pages_txt.append(txt.strip())
+                            extracted = "\n\n".join(pages_txt).strip()
+                            if extracted and len(extracted) > 60:
+                                if not req.texto_adicional or len(req.texto_adicional) < 50:
+                                    req.texto_adicional = extracted[:12000]
+                                    print(f"[AIService] Texto extraído con pypdf: {len(extracted)} caracteres")
+                        except Exception as pe:
+                            print(f"[pypdf extraction notice] {pe}")
+
+                        # 1.2 Si es menor a 15MB, pasar base64 para Gemini Multimodal OCR (esencial para CamScanner)
+                        import base64
+                        if len(file_bytes) <= 15 * 1024 * 1024:
+                            pdf_base64 = base64.b64encode(file_bytes).decode("utf-8")
+                            print(f"[AIService] PDF adjunto preparado para Gemini Multimodal OCR ({len(file_bytes)} bytes)")
+            except Exception as e:
+                print(f"[AIService Document Fetch Error] {e}")
+
         if api_key:
             try:
-                contenido = generar_con_gemini(req, api_key)
+                contenido = generar_con_gemini(req, api_key, pdf_base64=pdf_base64)
                 contenido = _mezclar_opciones_examen(contenido, req.tipo_recurso)
                 fuente = "gemini_api"
                 elapsed_ms = int((time.time() - start_time) * 1000)

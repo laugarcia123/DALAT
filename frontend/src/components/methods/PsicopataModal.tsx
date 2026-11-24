@@ -55,6 +55,7 @@ interface PsicopataModalProps {
 
 export interface MaterialFile {
   id: string;
+  backendDocId?: number;
   name: string;
   subject: string;
   size: string;
@@ -793,6 +794,7 @@ export default function PsicopataModal({
 
                 allDocs.push({
                   id: `doc_${d.id_documento}`,
+                  backendDocId: d.id_documento,
                   name: d.nombre,
                   subject: eq.nombre,
                   size: d.tamano || "1.0 MB",
@@ -870,6 +872,7 @@ export default function PsicopataModal({
         dificultad: "Avanzado",
         cantidad: cardCountGoal,
         archivo_nombre: selectedMaterial?.name,
+        documento_id: selectedMaterial?.backendDocId,
         texto_adicional: promptContexto,
       });
 
@@ -2334,6 +2337,7 @@ export default function PsicopataModal({
                               onClick={() => {
                                 const chosen: MaterialFile = {
                                   id: `doc_${doc.id_documento}`,
+                                  backendDocId: doc.id_documento,
                                   name: doc.nombre,
                                   subject: currentRepo?.nombre || "Repositorio Académico",
                                   size: doc.tamano || "1.0 MB",

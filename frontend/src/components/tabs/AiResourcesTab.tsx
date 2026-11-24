@@ -480,6 +480,7 @@ export default function AiResourcesTab({
             : "Opción 2 — Matemáticas y Física",
         cantidad: Math.min(questionCount, maxQuestionCount),
         archivo_nombre: selectedFile.name,
+        documento_id: selectedFile.backendDocId,
         texto_adicional: selectedFile.previewText || undefined,
       });
 

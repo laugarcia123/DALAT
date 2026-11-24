@@ -31,6 +31,7 @@ export interface GenerarRecursoRequest {
   cantidad?: number;
   archivo_nombre?: string;
   texto_adicional?: string;
+  documento_id?: number;
 }
 
 export interface GenerarRecursoResponse {

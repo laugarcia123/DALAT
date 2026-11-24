@@ -99,6 +99,49 @@ class StorageService:
         return None
 
     @classmethod
+    def get_file_bytes(cls, object_key_or_url: str) -> Optional[bytes]:
+        """Obtiene los bytes del archivo desde Cloudflare R2 o almacenamiento local."""
+        if not object_key_or_url:
+            return None
+
+        client = cls.get_client()
+
+        # Si viene una URL completa prefirmada de R2 o externa
+        if object_key_or_url.startswith("http://") or object_key_or_url.startswith("https://"):
+            try:
+                import urllib.request
+                with urllib.request.urlopen(object_key_or_url, timeout=30) as resp:
+                    return resp.read()
+            except Exception as e:
+                print(f"[Storage Download URL Error] {e}")
+
+        # Si viene como object_key (ej: documentos/user_1/...)
+        clean_key = object_key_or_url
+        if "documentos/" in clean_key:
+            clean_key = "documentos/" + clean_key.split("documentos/", 1)[1]
+
+        if client and clean_key.startswith("documentos/"):
+            try:
+                resp = client.get_object(Bucket=R2_BUCKET_NAME, Key=clean_key)
+                return resp["Body"].read()
+            except Exception as e:
+                print(f"[Cloudflare R2 Download Error] {e}")
+
+        # Fallback local en uploads/
+        filename_only = clean_key.split("/")[-1].split("?")[0]
+        local_base = Path(__file__).resolve().parent.parent / "uploads"
+        if local_base.exists():
+            for candidate in local_base.rglob(filename_only):
+                if candidate.is_file():
+                    try:
+                        with open(candidate, "rb") as f:
+                            return f.read()
+                    except Exception:
+                        pass
+
+        return None
+
+    @classmethod
     def delete_file(cls, object_key: str) -> bool:
         """Elimina un objeto de Cloudflare R2."""
         client = cls.get_client()

@@ -33,6 +33,7 @@ class GenerarRecursoRequest(BaseModel):
     cantidad: Optional[int] = Field(10, ge=1, le=50)
     archivo_nombre: Optional[str] = None
     texto_adicional: Optional[str] = None
+    documento_id: Optional[int] = None
 
 
 class GenerarRecursoResponse(BaseModel):
